@@ -89,6 +89,40 @@ pub fn resolve(name: &str) -> Result<Vec<String>, StepError> {
     Ok(packages.into_iter().collect())
 }
 
+/// Best-effort identification of the selection from an imported package set
+/// came from. A bare system-model records packages but no selection name, so the only
+/// way to name the desktop is to find which selection's closure the set fully covers;
+/// preferring the most specific where several nest.
+pub fn identify(packages: &[String]) -> Option<String> {
+    /// How much of a selection's closure must be present to be considered
+    const MIN_COVERAGE: f64 = 0.9;
+
+    let have: HashSet<&str> = packages.iter().map(String::as_str).collect();
+
+    desktops()
+        .into_iter()
+        .filter_map(|selection| {
+            let closure: Vec<String> = resolve(&selection.name)
+                .ok()?
+                .into_iter()
+                .filter(|package| !package.contains('('))
+                .collect();
+
+            if closure.is_empty() {
+                return None;
+            }
+
+            let matched = closure.iter().filter(|package| have.contains(package.as_str())).count();
+            let coverage = matched as f64 / closure.len() as f64;
+
+            // Tie-break on closure size so the result is stable rather than
+            // dependent on selection order.
+            (coverage >= MIN_COVERAGE).then_some((selection.name, matched, closure.len()))
+        })
+        .max_by_key(|(_, matched, size)| (*matched, *size))
+        .map(|(name, _, _)| name)
+}
+
 /// Parse one embedded selection document
 fn parse(raw: &str) -> Selection {
     let doc: KdlDocument = raw.parse().expect("embedded selection KDL must be valid");
@@ -118,10 +152,12 @@ fn parse(raw: &str) -> Selection {
 /// The packages every installation must carry regardless of what an imported
 /// model lists: the base system and kernel closures
 pub fn mandatory(selection: &str) -> Result<Vec<String>, StepError> {
-    if selection == "server" {
-        resolve("base")
-    } else {
-        resolve("desktop-common")
+    match selection {
+        // An absent selection means a bare system-model, whose floor is base.
+        // Defaulting to desktop-common would force a desktop onto a headless
+        // import.
+        "server" | "" => resolve("base"),
+        _ => resolve("desktop-common"),
     }
 }
 
@@ -146,6 +182,16 @@ mod tests {
         assert!(packages.contains(&"mesa-dri-drivers".to_string()));
         assert!(packages.contains(&"bash".to_string()));
         assert!(packages.contains(&"linux-stable".to_string()));
+    }
+
+    #[test]
+    fn identify_tolerates_selection_drift() {
+        let mut gnome = resolve("gnome").expect("gnome must resolve");
+        gnome.retain(|package| package != "font-opensans");
+
+        assert_eq!(identify(&gnome).as_deref(), Some("gnome"));
+        assert_eq!(identify(&resolve("server").unwrap()).as_deref(), Some("server"));
+        assert_eq!(identify(&[]), None);
     }
 
     #[test]

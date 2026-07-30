@@ -6,12 +6,25 @@ use crate::{CliStep, FrontendStep, selections};
 use installer::{DisplayInfo, Icon, Installer, Model, StepError, register_step};
 
 pub async fn run(_installer: &Installer, model: &mut Model) -> Result<(), StepError> {
-    if model.imported && !model.software.selection.is_empty() {
-        let _ = cliclack::log::info(format!(
-            "Using imported desktop environment {} with {} packages",
-            model.software.selection,
-            model.software.packages.len(),
-        ));
+    if model.imported && !model.software.selection.is_empty() || !model.software.packages.is_empty() {
+        // Recover the name from the package set so the summary and the
+        // regenerated install-model.kdl both record which desktop this was
+        if model.software.selection.is_empty()
+            && let Some(name) = selections::identify(&model.software.packages)
+        {
+            model.software.selection = name;
+        }
+
+        let _ = cliclack::log::info(match model.software.selection.as_str() {
+            "" => format!(
+                "Using imported package set of {} packages",
+                model.software.packages.len()
+            ),
+            selection => format!(
+                "Using imported desktop environment {selection} with {} packages",
+                model.software.packages.len(),
+            ),
+        });
         return Ok(());
     }
 
