@@ -200,7 +200,6 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic",
- "tower 0.5.3",
  "tracing",
  "tracing-error",
  "tracing-subscriber",
@@ -360,11 +359,8 @@ dependencies = [
  "installer",
  "kdl",
  "protocols",
- "serde",
- "serde_json",
  "sha-crypt",
  "tokio",
- "tonic",
  "tracing",
  "tracing-error",
  "tracing-subscriber",
@@ -1019,7 +1015,6 @@ dependencies = [
  "inventory",
  "protocols",
  "thiserror",
- "tokio",
  "tonic",
  "tracing",
 ]
@@ -1100,7 +1095,6 @@ name = "lichen-macros"
 version = "0.1.0"
 dependencies = [
  "proc-macro2",
- "quote",
  "syn 2.0.119",
 ]
 
@@ -1511,8 +1505,6 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tower 0.5.3",
- "tracing",
- "uuid",
 ]
 
 [[package]]

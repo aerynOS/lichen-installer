@@ -13,7 +13,7 @@ installer = { path = "../crates/installer" }
 
 [dependencies]
 protocols = { path = "../crates/protocols" }
-tonic = { workspace = true }
+#tonic = { workspace = true }
 installer = { path = "../crates/installer" }
 chrono.workspace = true
 chrono-tz.workspace = true
@@ -22,8 +22,8 @@ color-eyre = { workspace = true, features = ["issue-url"] }
 console.workspace = true
 kdl.workspace = true
 sha-crypt.workspace = true
-serde.workspace = true
-serde_json.workspace = true
+#serde.workspace = true
+#serde_json.workspace = true
 tracing.workspace = true
 tracing-error.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }

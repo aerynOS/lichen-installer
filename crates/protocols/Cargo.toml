@@ -14,8 +14,8 @@ tower.workspace = true
 hyper-util = { workspace = true, features = ["full"]}
 thiserror.workspace = true
 http.workspace = true
-uuid = { workspace = true, features = ["v4"] }
-tracing.workspace = true
+#uuid = { workspace = true, features = ["v4"] }
+#tracing.workspace = true
 
 disks = { workspace = true, optional = true }
 os-info = { workspace = true, optional = true }
@@ -23,6 +23,10 @@ locales-rs = { workspace = true, optional = true }
 
 [features]
 backend-utils = ["dep:disks", "dep:os-info", "dep:locales-rs"]
+
+# cargo machete picks up prost, but it's actually used
+[package.metadata.cargo-machete]
+ignored = ["prost"]
 
 [lints]
 workspace = true
