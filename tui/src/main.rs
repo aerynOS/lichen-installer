@@ -4,7 +4,14 @@
 
 //! Terminal user interface for the Lichen installer
 
+mod app;
+mod backend;
+mod events;
+mod screens;
+mod theme;
+
 use color_eyre::{Result, config::HookBuilder};
+use protocols::lichen::system::system_client::SystemClient;
 use ratatui::{crossterm::event, widgets::Paragraph};
 use std::{fs::File, panic};
 use tracing_subscriber::{
@@ -13,6 +20,10 @@ use tracing_subscriber::{
     layer::SubscriberExt,
     util::SubscriberInitExt,
 };
+
+use crate::app::App;
+
+const SOCKET: &str = "/run/lichen.sock";
 
 /// File only logging: the alternate screen owns the terminal, so nothing may
 /// print to stdout or stderr while the TUI is running.
@@ -57,13 +68,17 @@ async fn main() -> Result<()> {
     install_hooks()?;
     configure_tracing()?;
 
-    let mut terminal = ratatui::init();
-    terminal.draw(|frame| {
-        frame.render_widget(Paragraph::new("lichen tui - press any key"), frame.area());
-    })?;
+    // Connect before entering the alternate screen. If the backend is not
+    // running, start it and wait.
+    let (channel, spawned) = backend::connect(SOCKET).await?;
+    let info = SystemClient::new(channel.clone()).get_os_info(()).await?.into_inner();
+    let terminal = ratatui::init();
+    let result = App::new(channel.clone(), &info).run(terminal).await;
 
-    let _ = event::read()?;
-
+    // Restore first, report second.
     ratatui::restore();
-    Ok(())
+    if let Some(spawned) = spawned {
+        spawned.stop(channel).await;
+    }
+    result
 }

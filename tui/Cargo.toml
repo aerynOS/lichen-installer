@@ -14,10 +14,12 @@ path = "src/main.rs"
 installer = { path = "../crates/installer" }
 protocols = { path = "../crates/protocols" }
 color-eyre.workspace = true
+nix = { workspace = true, features = ["user"] }
+ratatui = "0.30.2"
 tokio = { workspace = true, features = ["full"] }
+tonic = { workspace = true, features = ["transport"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
-ratatui = "0.30.2"
 
 [lints]
 workspace = true

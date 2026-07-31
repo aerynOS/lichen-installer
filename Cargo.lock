@@ -3084,9 +3084,11 @@ version = "0.1.0"
 dependencies = [
  "color-eyre",
  "installer",
+ "nix 0.29.0",
  "protocols",
  "ratatui",
  "tokio",
+ "tonic",
  "tracing",
  "tracing-subscriber",
 ]
