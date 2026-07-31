@@ -7,12 +7,13 @@
 mod app;
 mod backend;
 mod events;
+mod filesystems;
+mod plan;
 mod screens;
 mod theme;
 
 use color_eyre::{Result, config::HookBuilder};
 use protocols::lichen::system::system_client::SystemClient;
-use ratatui::{crossterm::event, widgets::Paragraph};
 use std::{fs::File, panic};
 use tracing_subscriber::{
     EnvFilter, Layer,

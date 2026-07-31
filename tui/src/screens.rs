@@ -5,6 +5,7 @@
 //! The screen abstraction shared by every installation step.
 
 pub mod storage;
+pub mod strategy;
 pub mod welcome;
 
 use crate::{

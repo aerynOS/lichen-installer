@@ -4,7 +4,10 @@
 
 //! Messages into the application loop, and actions back out of a screen.
 
-use protocols::lichen::storage::disks::Disk;
+use protocols::lichen::storage::{
+    disks::Disk,
+    provisioner::{StrategyDefinition, StrategyPlan},
+};
 use ratatui::crossterm::event::{self, Event};
 use std::{thread, time::Duration};
 use tokio::sync::mpsc::UnboundedSender;
@@ -21,6 +24,8 @@ pub enum Msg {
     Failed(String),
     /// The available disks came back from the backend
     Disks(Vec<Disk>),
+    /// Every strategy that produced a plan for the chosen disk and its plan
+    Strategies(Vec<(StrategyDefinition, StrategyPlan)>),
 }
 
 /// What a screen tells the applicaiton after seeing a key.
