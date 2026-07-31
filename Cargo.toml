@@ -3,7 +3,7 @@ members = [
     "backend",
     "cli",
     "crates/*"
-]
+, "tui"]
 default-members = [
     "backend",
     "cli"

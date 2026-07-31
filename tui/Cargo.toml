@@ -1,0 +1,23 @@
+[package]
+name = "tui"
+version = "0.1.0"
+edition = "2024"
+description = "TUI for the lichen installer"
+repository = "https://github.com/AerynOS/lichen-installer"
+authors = ["Bryan Hyland <bryan.hyland32@gmail.com"]
+
+[[bin]]
+name = "lichen_tui"
+path = "src/main.rs"
+
+[dependencies]
+installer = { path = "../crates/installer" }
+protocols = { path = "../crates/protocols" }
+color-eyre.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tracing.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter"] }
+ratatui = "0.30.2"
+
+[lints]
+workspace = true
