@@ -4,6 +4,7 @@
 
 //! The screen abstraction shared by every installation step.
 
+pub mod storage;
 pub mod welcome;
 
 use crate::{
@@ -12,8 +13,9 @@ use crate::{
 };
 use installer::Model;
 use ratatui::{Frame, crossterm::event::KeyEvent, layout::Rect, widgets::Paragraph};
+use std::future::Future;
 use tokio::sync::mpsc::UnboundedSender;
-use tonic::transport::Channel;
+use tonic::{Status, transport::Channel};
 
 /// What a screen needs in order to start background work.
 ///
@@ -24,6 +26,26 @@ use tonic::transport::Channel;
 pub struct Context {
     pub channel: Channel,
     pub tx: UnboundedSender<Msg>,
+}
+
+impl Context {
+    /// Run an RPC on a background task, delivering its result back into the
+    /// application loop.
+    pub fn spawn<F>(&self, task: F)
+    where
+        F: Future<Output = Result<Msg, Status>> + Send + 'static,
+    {
+        let tx = self.tx.clone();
+
+        tokio::spawn(async move {
+            let msg = match task.await {
+                Ok(msg) => msg,
+                Err(status) => Msg::Failed(status.message().to_string()),
+            };
+
+            let _ = tx.send(msg);
+        });
+    }
 }
 
 /// One installation step, prendered as a full screen.
@@ -49,6 +71,10 @@ pub trait Screen {
     /// one, so a result cannot be lost by navigating away while an RPC is still
     /// in flight.
     fn on_message(&mut self, _msg: &Msg, _model: &mut Model) {}
+    /// Key hints for the footer, as (key, meaning) pairs.
+    fn hints(&self) -> &[(&str, &str)] {
+        &[]
+    }
 }
 
 /// Stand in for a step that has not been built yet, so the sidebar shows the

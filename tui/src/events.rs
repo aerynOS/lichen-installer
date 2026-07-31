@@ -4,6 +4,7 @@
 
 //! Messages into the application loop, and actions back out of a screen.
 
+use protocols::lichen::storage::disks::Disk;
 use ratatui::crossterm::event::{self, Event};
 use std::{thread, time::Duration};
 use tokio::sync::mpsc::UnboundedSender;
@@ -18,6 +19,8 @@ pub enum Msg {
     Terminal(Event),
     /// A background task failed; surfaced in the error overlay
     Failed(String),
+    /// The available disks came back from the backend
+    Disks(Vec<Disk>),
 }
 
 /// What a screen tells the applicaiton after seeing a key.

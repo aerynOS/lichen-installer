@@ -6,7 +6,7 @@
 
 use crate::{
     events::{self, Action, Msg},
-    screens::{Context, Placeholder, Screen, welcome::Welcome},
+    screens::{Context, Placeholder, Screen, storage::Storage, welcome::Welcome},
     theme::*,
 };
 use color_eyre::Result;
@@ -73,7 +73,7 @@ impl App {
         let screens: Vec<Box<dyn Screen>> = vec![
             Box::new(Welcome::new(info)),
             Box::new(Placeholder::new("Network")),
-            Box::new(Placeholder::new("Storage")),
+            Box::new(Storage::new()),
             Box::new(Placeholder::new("Strategy")),
             Box::new(Placeholder::new("Locale")),
             Box::new(Placeholder::new("Timezone")),
@@ -278,13 +278,26 @@ impl App {
     }
 
     fn render_footer(&self, frame: &mut Frame<'_>, area: Rect) {
-        let hints = match &self.overlay {
-            Overlay::None => " Tab/Shift+Tab step · ↑↓move · ⏎select · Ctrl+C quit ",
-            Overlay::Quit => " y quit · Esc keep going ",
-            Overlay::Error(_) => " Esc dismiss ",
+        let line = match &self.overlay {
+            Overlay::Quit => Line::styled(" y quit · Esc to continue ", HINT),
+            Overlay::Error(_) => Line::styled("Esc dismiss ", HINT),
+            Overlay::None => {
+                let mut spans = vec![Span::raw(" ")];
+
+                for (key, meaning) in self.screens[self.current].hints() {
+                    spans.push(Span::styled(*key, STEP_ACTIVE));
+                    spans.push(Span::styled(format!(" {meaning} · "), HINT));
+                }
+
+                spans.push(Span::styled("Tab/⇧Tab", STEP_ACTIVE));
+                spans.push(Span::styled(" step · ", HINT));
+                spans.push(Span::styled("Ctrl+C", STEP_ACTIVE));
+                spans.push(Span::styled(" quit ", HINT));
+                Line::from(spans)
+            }
         };
 
-        frame.render_widget(Paragraph::new(Line::styled(hints, HINT)), area);
+        frame.render_widget(Paragraph::new(line), area);
     }
 
     fn render_overlay(&self, frame: &mut Frame<'_>, area: Rect) {
