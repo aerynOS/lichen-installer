@@ -4,8 +4,10 @@
 
 //! The screen abstraction shared by every installation step.
 
+pub mod locale;
 pub mod storage;
 pub mod strategy;
+pub mod timezone;
 pub mod welcome;
 
 use crate::{

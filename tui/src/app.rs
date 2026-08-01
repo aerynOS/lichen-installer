@@ -6,7 +6,10 @@
 
 use crate::{
     events::{self, Action, Msg},
-    screens::{Context, Placeholder, Screen, storage::Storage, strategy::Strategy, welcome::Welcome},
+    screens::{
+        Context, Placeholder, Screen, locale::Locale, storage::Storage, strategy::Strategy, timezone::Timezone,
+        welcome::Welcome,
+    },
     theme::*,
 };
 use color_eyre::Result;
@@ -75,8 +78,8 @@ impl App {
             Box::new(Placeholder::new("Network")),
             Box::new(Storage::new()),
             Box::new(Strategy::new()),
-            Box::new(Placeholder::new("Locale")),
-            Box::new(Placeholder::new("Timezone")),
+            Box::new(Locale::new()),
+            Box::new(Timezone::new()),
             Box::new(Placeholder::new("Desktop")),
             Box::new(Placeholder::new("Accounts")),
             Box::new(Placeholder::new("Summary")),

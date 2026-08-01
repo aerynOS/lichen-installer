@@ -13,7 +13,9 @@ path = "src/main.rs"
 [dependencies]
 installer = { path = "../crates/installer" }
 protocols = { path = "../crates/protocols" }
+chrono-tz.workspace = true
 color-eyre.workspace = true
+kdl.workspace = true
 nix = { workspace = true, features = ["user"] }
 ratatui = "0.30.2"
 tokio = { workspace = true, features = ["full"] }

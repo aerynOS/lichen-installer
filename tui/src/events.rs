@@ -4,9 +4,12 @@
 
 //! Messages into the application loop, and actions back out of a screen.
 
-use protocols::lichen::storage::{
-    disks::Disk,
-    provisioner::{StrategyDefinition, StrategyPlan},
+use protocols::lichen::{
+    locales::Locale,
+    storage::{
+        disks::Disk,
+        provisioner::{StrategyDefinition, StrategyPlan},
+    },
 };
 use ratatui::crossterm::event::{self, Event};
 use std::{thread, time::Duration};
@@ -26,6 +29,8 @@ pub enum Msg {
     Disks(Vec<Disk>),
     /// Every strategy that produced a plan for the chosen disk and its plan
     Strategies(Vec<(StrategyDefinition, StrategyPlan)>),
+    /// The locale list came back from the backend
+    Locales(Vec<Locale>),
 }
 
 /// What a screen tells the applicaiton after seeing a key.

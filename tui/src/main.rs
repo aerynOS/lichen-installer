@@ -10,7 +10,9 @@ mod events;
 mod filesystems;
 mod plan;
 mod screens;
+mod selections;
 mod theme;
+mod widgets;
 
 use color_eyre::{Result, config::HookBuilder};
 use protocols::lichen::system::system_client::SystemClient;
