@@ -11,6 +11,7 @@ fn main() {
     println!("cargo:rerun-if-changed=storage/provisioner.proto");
     println!("cargo:rerun-if-changed=storage/types.proto");
     println!("cargo:rerun-if-changed=install.proto");
+    println!("cargo:rerun-if-changed=network.proto");
 
     tonic_build::configure()
         .build_server(true)
@@ -27,6 +28,7 @@ fn main() {
                 "storage/provisioner.proto",
                 "storage/types.proto",
                 "install.proto",
+                "network.proto",
             ],
             &["."],
         )

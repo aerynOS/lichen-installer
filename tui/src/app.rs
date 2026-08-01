@@ -7,8 +7,8 @@
 use crate::{
     events::{self, Action, Msg},
     screens::{
-        Context, Placeholder, Screen, locale::Locale, storage::Storage, strategy::Strategy, timezone::Timezone,
-        welcome::Welcome,
+        Context, Placeholder, Screen, accounts::Accounts, locale::Locale, storage::Storage, strategy::Strategy,
+        timezone::Timezone, welcome::Welcome,
     },
     theme::*,
 };
@@ -81,7 +81,7 @@ impl App {
             Box::new(Locale::new()),
             Box::new(Timezone::new()),
             Box::new(Placeholder::new("Desktop")),
-            Box::new(Placeholder::new("Accounts")),
+            Box::new(Accounts::new()),
             Box::new(Placeholder::new("Summary")),
         ];
 
@@ -160,6 +160,7 @@ impl App {
             Action::Next => self.next(),
             Action::Back => self.back(),
             Action::Ignored => self.on_global_key(key),
+            Action::Failed(err) => eprintln!("Action failed {err}"),
         }
     }
 

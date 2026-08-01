@@ -1,0 +1,86 @@
+// SPDX-FileCopyrightText: Copyright © 2026 AerynOS Developers
+//
+// SPDX-License-Identifier: MPL-2.0
+
+syntax = "proto3";
+
+package lichen.network;
+
+import "google/protobuf/empty.proto";
+
+service Network {
+  // Current link and connectivity state
+  rpc Status(google.protobuf.Empty) returns (NetworkStatus) {}
+
+  // Rescan and list visible access points
+  rpc ScanWifi(google.protobuf.Empty) returns (ScanWifiResponse) {}
+
+  // Associate with an access point on the live system
+  rpc ConnectWifi(ConnectWifiRequest) returns (ConnectWifiResponse) {}
+}
+
+// A network interface known to NetworkManager
+message Device {
+  // Interface name in the kernel, i.e. "wlan0"
+  string name = 1;
+
+  // NetworkManager device type, i.e. "wifi" or "ethernet"
+  string kind = 2;
+
+  // Device state, i.e. "connected" or "unavailable"
+  string state = 3;
+
+  // Name of the active connection profile, when there is one
+  optional string connection = 4;
+}
+
+// Response message for Status
+message NetworkStatus {
+  // True when connectivity is full; the insaller needs this to sync
+  bool online = 1;
+
+  // NetworkManager connectivity: none, portal, limited, full, or unknown
+  string connectivity = 2;
+
+  // Every device except loopback
+  repeated Device devices = 3;
+
+  // Whether any wireless devices exists to configure
+  bool wifi_available = 4;
+}
+
+// A visible wireless network
+message AccessPoint {
+  string ssid = 1;
+
+  // Signal strength as a percentage
+  uint32 signal = 2;
+
+  // Security in used, i.e. "WPA2"; empty for an open network
+  string security = 3;
+
+  // Whether this is the network currently associated
+  bool in_use = 4;
+}
+
+message ScanWifiResponse {
+  repeated AccessPoint access_points = 1;
+}
+
+message ConnectWifiRequest {
+  string ssid = 1;
+
+  // Pre-shared key; absend for an open network
+  optional string psk = 2;
+
+  // Is this a hidden ssid network
+  bool hidden = 3;
+
+  // Interface to associate with; NetworkManager chooses when absent
+  optional string device = 4;
+}
+
+message ConnectWifiResponse {
+  // The connection profile NetworkManager created or activated
+  string profile = 1;
+}

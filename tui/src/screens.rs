@@ -4,6 +4,7 @@
 
 //! The screen abstraction shared by every installation step.
 
+pub mod accounts;
 pub mod locale;
 pub mod storage;
 pub mod strategy;

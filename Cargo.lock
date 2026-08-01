@@ -3089,6 +3089,7 @@ dependencies = [
  "nix 0.29.0",
  "protocols",
  "ratatui",
+ "sha-crypt",
  "tokio",
  "tonic",
  "tracing",

@@ -43,6 +43,8 @@ pub enum Action {
     Ignored,
     /// Handled by the screen
     Consumed,
+    /// Action requested has failed
+    Failed(String),
     /// Advance to the next step
     Next,
     /// Return to the previous step

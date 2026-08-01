@@ -13,6 +13,7 @@ pub mod auth;
 pub mod disk_service;
 pub mod install_service;
 pub mod locales_service;
+pub mod network_service;
 pub mod plans;
 pub mod provisioner_service;
 pub mod system_service;
