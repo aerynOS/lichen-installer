@@ -92,6 +92,14 @@ impl Accounts {
             Err(action) => return action,
         };
 
+        model.accounts.user = Some(User {
+            username,
+            real_name,
+            password_hash: user_hash,
+        });
+        model.accounts.root_password_hash = Some(root_hash);
+        self.problem = None;
+
         Action::Next
     }
 

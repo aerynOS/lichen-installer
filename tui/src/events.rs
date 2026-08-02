@@ -6,6 +6,7 @@
 
 use protocols::lichen::{
     locales::Locale,
+    network::{AccessPoint, NetworkStatus},
     storage::{
         disks::Disk,
         provisioner::{StrategyDefinition, StrategyPlan},
@@ -31,6 +32,12 @@ pub enum Msg {
     Strategies(Vec<(StrategyDefinition, StrategyPlan)>),
     /// The locale list came back from the backend
     Locales(Vec<Locale>),
+    /// The current network state came back
+    NetworkState(NetworkStatus),
+    /// A wireless can completed
+    AccessPoints(Vec<AccessPoint>),
+    /// A wireless connection was establish, naming its profile
+    WifiConnected(String),
 }
 
 /// What a screen tells the applicaiton after seeing a key.

@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 mod accounts;
+mod network;
 mod region;
 mod software;
 mod storage;
@@ -25,6 +26,8 @@ pub struct Model {
     pub accounts: accounts::Model,
     /// Software selections
     pub software: software::Model,
+    /// Network settings carried onto the isntalled system
+    pub network: network::Model,
     /// Set when the model came from an OS refresh or an imported document.
     pub imported: bool,
 }

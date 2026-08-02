@@ -7,8 +7,8 @@
 use crate::{
     events::{self, Action, Msg},
     screens::{
-        Context, Placeholder, Screen, accounts::Accounts, locale::Locale, storage::Storage, strategy::Strategy,
-        timezone::Timezone, welcome::Welcome,
+        Context, Placeholder, Screen, accounts::Accounts, desktop::Desktop, locale::Locale, network::Network,
+        storage::Storage, strategy::Strategy, timezone::Timezone, welcome::Welcome,
     },
     theme::*,
 };
@@ -75,12 +75,12 @@ impl App {
             .unwrap_or_else(|| "Unknown OS".into());
         let screens: Vec<Box<dyn Screen>> = vec![
             Box::new(Welcome::new(info)),
-            Box::new(Placeholder::new("Network")),
+            Box::new(Network::new()),
             Box::new(Storage::new()),
             Box::new(Strategy::new()),
             Box::new(Locale::new()),
             Box::new(Timezone::new()),
-            Box::new(Placeholder::new("Desktop")),
+            Box::new(Desktop::new()),
             Box::new(Accounts::new()),
             Box::new(Placeholder::new("Summary")),
         ];
@@ -160,7 +160,7 @@ impl App {
             Action::Next => self.next(),
             Action::Back => self.back(),
             Action::Ignored => self.on_global_key(key),
-            Action::Failed(err) => eprintln!("Action failed {err}"),
+            Action::Failed(err) => self.overlay = Overlay::Error(err),
         }
     }
 
@@ -275,7 +275,7 @@ impl App {
             x: area.x + 2,
             y: area.y + 1,
             width: area.width.saturating_sub(3),
-            height: area.width.saturating_sub(1),
+            height: area.height.saturating_sub(1),
         };
 
         self.screens[self.current].render(frame, padded, &self.model);
