@@ -92,7 +92,7 @@ fn mounts(plan: &StrategyPlan) -> Vec<Line<'static>> {
         && !has_home
         && let Some(device) = root_device
     {
-        lines.push(Line::styled(format!("  /home ← {device} (subvolume=@home"), BODY));
+        lines.push(Line::styled(format!("  /home ← {device} (subvolume=@home)"), BODY));
     }
 
     lines

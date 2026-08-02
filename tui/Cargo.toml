@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 description = "TUI for the lichen installer"
 repository = "https://github.com/AerynOS/lichen-installer"
-authors = ["Bryan Hyland <bryan.hyland32@gmail.com"]
+authors = ["Bryan Hyland <bryan.hyland32@gmail.com>"]
 
 [[bin]]
 name = "lichen_tui"
@@ -13,6 +13,7 @@ path = "src/main.rs"
 [dependencies]
 installer = { path = "../crates/installer" }
 protocols = { path = "../crates/protocols" }
+chrono.workspace = true
 chrono-tz.workspace = true
 color-eyre.workspace = true
 kdl.workspace = true

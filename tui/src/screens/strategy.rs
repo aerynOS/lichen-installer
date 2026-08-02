@@ -12,6 +12,7 @@ use super::{Context, Screen};
 use crate::{
     events::{Action, Msg},
     filesystems, plan,
+    selections::packages_for,
     theme::*,
 };
 use installer::Model;
@@ -205,6 +206,15 @@ impl Strategy {
         model.storage.strategy_id = definition.id.clone();
         model.storage.strategy_name = definition.name.clone();
         model.storage.plan = Some(plan.clone());
+
+        // The root filesystem just changed, so its packages have to be re-derived.
+        // A no-op unless a desktop has already been chosen. This is basically a
+        // guard if someone changes their mind after chosing a desktop environment
+        // so packages that aren't needed aren't installed and the ones that are
+        // needed are not accidentally removed.
+        if let Err(error) = packages_for(model) {
+            return Action::Failed(error.to_string());
+        }
         Action::Next
     }
 }

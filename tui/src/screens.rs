@@ -10,6 +10,7 @@ pub mod locale;
 pub mod network;
 pub mod storage;
 pub mod strategy;
+pub mod summary;
 pub mod timezone;
 pub mod welcome;
 

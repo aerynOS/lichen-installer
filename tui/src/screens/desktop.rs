@@ -7,7 +7,7 @@
 use super::{Context, Screen};
 use crate::{
     events::Action,
-    selections::{Selection, desktops, resolve},
+    selections::{Selection, desktops, packages_for},
     theme::*,
     widgets::{Entry, FilterList, Outcome},
 };
@@ -66,14 +66,11 @@ impl Screen for Desktop {
                 };
                 let picked = entry.value.clone();
 
-                // Resolved here rather than summary, so a selection that
+                model.software.selection = picked;
+                // Derived here rather than the summary, so a selection that
                 // cannot be satisfied is reported while it can still be changed.
-                match resolve(&picked) {
-                    Ok(packages) => {
-                        model.software.selection = picked;
-                        model.software.packages = packages;
-                        Action::Next
-                    }
+                match packages_for(model) {
+                    Ok(()) => Action::Next,
                     Err(error) => Action::Failed(error.to_string()),
                 }
             }
@@ -106,7 +103,7 @@ impl Screen for Desktop {
         self.list.set_entries(entries, &model.software.selection);
     }
 
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, model: &Model) {
+    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, _model: &Model) {
         let [heading, body, detail] =
             Layout::vertical([Constraint::Length(2), Constraint::Min(1), Constraint::Length(5)]).areas(area);
 

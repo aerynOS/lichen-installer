@@ -8,6 +8,7 @@ mod app;
 mod backend;
 mod events;
 mod filesystems;
+mod install_model;
 mod plan;
 mod screens;
 mod selections;

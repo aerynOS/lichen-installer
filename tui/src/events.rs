@@ -56,6 +56,8 @@ pub enum Action {
     Next,
     /// Return to the previous step
     Back,
+    /// Confirmed at the summary, past this point the disk gets written
+    Commit,
 }
 
 /// How long the input thread waits before checking whether the app is gone

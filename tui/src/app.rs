@@ -8,7 +8,7 @@ use crate::{
     events::{self, Action, Msg},
     screens::{
         Context, Placeholder, Screen, accounts::Accounts, desktop::Desktop, locale::Locale, network::Network,
-        storage::Storage, strategy::Strategy, timezone::Timezone, welcome::Welcome,
+        storage::Storage, strategy::Strategy, summary::Summary, timezone::Timezone, welcome::Welcome,
     },
     theme::*,
 };
@@ -39,7 +39,6 @@ const SIDEBAR_WIDTH: u16 = 16;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     Choosing,
-    #[allow(dead_code)]
     Committed,
 }
 
@@ -82,7 +81,8 @@ impl App {
             Box::new(Timezone::new()),
             Box::new(Desktop::new()),
             Box::new(Accounts::new()),
-            Box::new(Placeholder::new("Summary")),
+            Box::new(Summary::new()),
+            Box::new(Placeholder::new("Install")),
         ];
 
         Self {
@@ -160,6 +160,10 @@ impl App {
             Action::Next => self.next(),
             Action::Back => self.back(),
             Action::Ignored => self.on_global_key(key),
+            Action::Commit => {
+                self.next();
+                self.phase = Phase::Committed;
+            }
             Action::Failed(err) => self.overlay = Overlay::Error(err),
         }
     }

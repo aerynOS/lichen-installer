@@ -4,9 +4,11 @@
 
 //! Embedded package selections for the target installation
 
-use installer::StepError;
+use installer::{Model, StepError};
 use kdl::{KdlDocument, KdlNode};
 use std::collections::{BTreeSet, HashMap, HashSet};
+
+use crate::filesystems::ensure_filesystem_packages;
 
 /// A selection definition loaded from data/selections
 #[derive(Debug, Clone)]
@@ -89,6 +91,23 @@ pub fn mandatory(selection: &str) -> Result<Vec<String>, StepError> {
     } else {
         resolve("desktop-common")
     }
+}
+
+/// Recompute the target's package list from the model's current choices: the
+/// chosen desktop's packages + required chosen root filesystem packages.
+///
+/// Derived from scratch rather than added to, so changing either choice cannot
+/// leave the other's packages beind. For example: switching btrfs to xfs drops
+/// `btrfs-progs` instead of carrying both and the chosen desktop packages are
+/// left in tact.
+pub fn packages_for(model: &mut Model) -> Result<(), StepError> {
+    if model.software.selection.is_empty() {
+        return Ok(());
+    }
+
+    model.software.packages = resolve(&model.software.selection)?;
+    ensure_filesystem_packages(model);
+    Ok(())
 }
 
 /// A string property of a KDL node.
