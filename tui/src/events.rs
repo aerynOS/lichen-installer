@@ -38,6 +38,8 @@ pub enum Msg {
     AccessPoints(Vec<AccessPoint>),
     /// A wireless connection was establish, naming its profile
     WifiConnected(String),
+    InstallProgress(String),
+    InstallFinished,
 }
 
 /// What a screen tells the applicaiton after seeing a key.

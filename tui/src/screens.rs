@@ -6,6 +6,7 @@
 
 pub mod accounts;
 pub mod desktop;
+pub mod install;
 pub mod locale;
 pub mod network;
 pub mod storage;

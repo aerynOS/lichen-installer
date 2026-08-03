@@ -7,8 +7,8 @@
 use crate::{
     events::{self, Action, Msg},
     screens::{
-        Context, Placeholder, Screen, accounts::Accounts, desktop::Desktop, locale::Locale, network::Network,
-        storage::Storage, strategy::Strategy, summary::Summary, timezone::Timezone, welcome::Welcome,
+        Context, Placeholder, Screen, accounts::Accounts, desktop::Desktop, install::Install, locale::Locale,
+        network::Network, storage::Storage, strategy::Strategy, summary::Summary, timezone::Timezone, welcome::Welcome,
     },
     theme::*,
 };
@@ -82,7 +82,7 @@ impl App {
             Box::new(Desktop::new()),
             Box::new(Accounts::new()),
             Box::new(Summary::new()),
-            Box::new(Placeholder::new("Install")),
+            Box::new(Install::new()),
         ];
 
         Self {
