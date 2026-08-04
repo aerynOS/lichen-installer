@@ -6,7 +6,7 @@
 
 pub mod btrfs;
 
-use crate::{auth::AuthService, install_service::btrfs::is_btrfs};
+use crate::{auth::AuthService, install_service::btrfs::is_btrfs, network_service::split_terse};
 use disks::BlockDevice;
 use lichen_macros::authorized;
 use protocols::lichen::install::{
@@ -18,7 +18,7 @@ use std::{
     collections::VecDeque,
     fs,
     io::{BufRead, BufReader, Write},
-    os::unix,
+    os::unix::{self, fs::PermissionsExt},
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
@@ -44,8 +44,17 @@ const SYSTEM_MODEL_PATH: &str = "usr/lib/system-model.kdl";
 /// The installer's permanent record on the target: the install-model superset
 /// wrapping the system-model
 const INSTALL_MODEL_PATH: &str = "etc/moss/install-model.kdl";
+/// NetworkManager's system keyfile directory, on the live system and target alike
+const NM_CONNECTIONS: &str = "/etc/NetworkManager/system-connections";
+/// iwd's credential store, where a hidden network's key actually lives
+const IWD_STORE: &str = "/var/lib/iwd";
 /// Repo config directory inside the target root
 const REPO_DIR: &str = "etc/moss/repo.d";
+/// A progress callback: the phase now running, and a line for the log.
+///
+/// An empty phase means "still whatever was last announced", which is what
+/// every line captured from a subprocess is.
+type Progress<'a> = &'a (dyn Fn(&str, String) + Sync);
 /// The unstable repo kdl entry
 const UNSTABLE_REPO: &str = r#"unstable {
     description "AerynOS unstable package stream"
@@ -146,6 +155,7 @@ impl Install for Service {
                     let update = InstallProgress {
                         message: String::new(),
                         finished: false,
+                        phase: String::new(),
                     };
 
                     if tx.blocking_send(Ok(update)).is_err() {
@@ -156,10 +166,11 @@ impl Install for Service {
         }
 
         thread::spawn(move || {
-            let progress = |message: String| {
+            let progress = |phase: &str, message: String| {
                 let _ = tx.blocking_send(Ok(InstallProgress {
                     message,
                     finished: false,
+                    phase: phase.to_string(),
                 }));
             };
             let result = install_target(&request, &progress);
@@ -170,6 +181,7 @@ impl Install for Service {
                     let _ = tx.blocking_send(Ok(InstallProgress {
                         message: "Installation complete".to_string(),
                         finished: true,
+                        phase: String::new(),
                     }));
                 }
                 Err(status) => {
@@ -271,7 +283,7 @@ fn discover_models() -> Result<Vec<DiscoveredModel>, Status> {
 
 /// Mount the target filesystems, install the OS via moss from the system
 /// model written earlier, configure the target, and always unmount again
-fn install_target(request: &InstallSystemRequest, progress: &(dyn Fn(String) + Sync)) -> Result<(), Status> {
+fn install_target(request: &InstallSystemRequest, progress: Progress<'_>) -> Result<(), Status> {
     let target = Path::new(TARGET_MOUNT);
     fs::create_dir_all(target)?;
 
@@ -290,7 +302,7 @@ fn install_target(request: &InstallSystemRequest, progress: &(dyn Fn(String) + S
 
     let mut mounted: Vec<PathBuf> = Vec::new();
     let result = (|| -> Result<(), Status> {
-        progress("Mounting target filesystems".to_string());
+        progress("mount", "Mounting target filesystems".to_string());
         for mount in &mounts {
             let mountpoint = target.join(mount.mountpoint.trim_start_matches('/'));
             fs::create_dir_all(&mountpoint)?;
@@ -324,13 +336,13 @@ fn install_target(request: &InstallSystemRequest, progress: &(dyn Fn(String) + S
             warn!("no repos to prime; sync will fail unless moss bootstraps them itself");
         }
         configure_repos(target)?;
-        progress("Refreshing package index".to_string());
+        progress("index", "Refreshing package index".to_string());
         run(Command::new("moss").arg("-D").arg(target).args(["repo", "update"]))?;
 
         // moss materializes the system from the model, including populating
         // the mounted ESP/XBOOTLDR with boot entries via its blsforme
         // integration, which is why the boot mounts must be live first
-        progress("Installing packages".to_string());
+        progress("packages", "Installing packages".to_string());
         info!("Running moss sync against the target (this can take a while)");
         run_streaming(
             Command::new("moss")
@@ -343,7 +355,7 @@ fn install_target(request: &InstallSystemRequest, progress: &(dyn Fn(String) + S
             progress,
         )?;
 
-        progress("Configuring target system".to_string());
+        progress("configure", "Configuring target system".to_string());
         configure_target(target, request)
     })();
 
@@ -351,7 +363,7 @@ fn install_target(request: &InstallSystemRequest, progress: &(dyn Fn(String) + S
     // target root, so unmounting the root first fails with EBUSY and pins it
     // for the rest of the session. sync last, because the user is told they
     // may reboot the moment this returns.
-    progress("Unmounting target filesystems".to_string());
+    progress("unmount", "Unmounting target filesystems".to_string());
     for mountpoint in mounted.iter().rev() {
         let _ = run(Command::new("umount").arg(mountpoint));
     }
@@ -392,6 +404,26 @@ fn configure_target(target: &Path, req: &InstallSystemRequest) -> Result<(), Sta
         unix::fs::symlink(format!("../usr/share/zoneinfo/{}", req.timezone), &localtime)?;
     }
 
+    if !req.keymap.is_empty() {
+        fs::write(target.join("etc/vtconsole.conf"), format!("KEYMAP={}\n", req.keymap))?;
+    }
+
+    if !req.x11_layout.is_empty() {
+        let directory = target.join("etc/X11/xorg.conf.d");
+        fs::create_dir_all(&directory)?;
+        fs::write(
+            directory.join("00-keyboard.conf"),
+            format!(
+                "Section \"InputClass\"\n\
+                 \x20       Identifier \"system-keyboard\"\n\
+                 \x20       MatchIsKeyboard \"on\"\n\
+                 \x20       Option \"XkbLayout\" \"{}\"\n\
+                 EndSection\n",
+                req.x11_layout
+            ),
+        )?;
+    }
+
     // moss installs systemd's /etc/machine-id from the package set, so the
     // target would inherit the live medium's id. Every machine installed from
     // that medium would then share a DHCP DUID and journal id, and systemd
@@ -426,7 +458,73 @@ fn configure_target(target: &Path, req: &InstallSystemRequest) -> Result<(), Sta
     }
 
     write_fstab(target, req)?;
+    if let Some(profile) = req.network_profile.as_deref().filter(|profile| !profile.is_empty()) {
+        copy_network_profile(target, profile)?;
+    }
 
+    Ok(())
+}
+
+/// Carry the live system's wireless credentials onto the target.
+///
+/// Two carriers, because AerynOS runst NetworkManager on the iwd backend. A
+/// visible network gets a NM keyfile under /etc holding the psk. A hidden one
+/// is connected by iwctl, no NM only write a volatile stub under /run with
+/// no `psk=` in it at all; copying that would install a profile that can never
+/// authenticate. They key for those lives in iwd's own store, which iwd on the
+/// target reads regardless of which profile NM holds.
+fn copy_network_profile(target: &Path, profile: &str) -> Result<(), Status> {
+    if let Some(source) = nm_keyfile(profile)?
+        && source.starts_with(NM_CONNECTIONS)
+        && source.is_file()
+        && let Some(name) = source.file_name().and_then(|name| name.to_str())
+    {
+        copy_secret(&source, &target.join(NM_CONNECTIONS.trim_start_matches('/')), name)?;
+    }
+
+    for suffix in ["psk", "open", "8021x"] {
+        let name = format!("{profile}.{suffix}");
+        let source = PathBuf::from(IWD_STORE).join(&name);
+
+        if source.is_file() {
+            copy_secret(&source, &target.join(IWD_STORE.trim_start_matches('/')), &name)?;
+        }
+    }
+    Ok(())
+}
+
+/// Ask NetworkManager which keyfile backs a profile
+///
+/// A missing answer is not fatal: the install continues, the target simply
+/// comes up without a connection.
+fn nm_keyfile(profile: &str) -> Result<Option<PathBuf>, Status> {
+    let output = Command::new("nmcli")
+        .args(["-t", "-f", "NAME,FILENAME", "connection", "show"])
+        .output()
+        .map_err(|e| Status::internal(format!("failed to spawn nmcli: {e}")))?;
+
+    if !output.status.success() {
+        warn!("nmcli could not list connections; the target will carry no network profile");
+        return Ok(None);
+    }
+
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .map(split_terse)
+        .find(|fields| fields.first().is_some_and(|name| name == profile))
+        .and_then(|fields| fields.get(1).map(PathBuf::from)))
+}
+
+/// Copy a credential into the target as 0600 root:root, in a 0700 directory
+fn copy_secret(source: &Path, directory: &Path, name: &str) -> Result<(), Status> {
+    fs::create_dir_all(directory)?;
+    fs::set_permissions(directory, fs::Permissions::from_mode(0o700))?;
+
+    let destination = directory.join(name);
+    fs::copy(source, &destination)?;
+    fs::set_permissions(&destination, fs::Permissions::from_mode(0o600))?;
+
+    info!("carried {} onto the target", source.display());
     Ok(())
 }
 
@@ -479,7 +577,7 @@ fn blkid(device: &str, tag: &str) -> Result<String, Status> {
 
 /// Run a long command forwarding its output lines as progress, keeping
 /// tail of recent lines for error reporting
-fn run_streaming(command: &mut Command, progress: &(dyn Fn(String) + Sync)) -> Result<(), Status> {
+fn run_streaming(command: &mut Command, progress: Progress<'_>) -> Result<(), Status> {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -510,7 +608,7 @@ fn run_streaming(command: &mut Command, progress: &(dyn Fn(String) + Sync)) -> R
 
             let cleaned = clean_line(&line);
             if !cleaned.is_empty() {
-                progress(cleaned);
+                progress("", cleaned);
             }
         }
     });

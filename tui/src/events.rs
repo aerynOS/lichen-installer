@@ -5,7 +5,8 @@
 //! Messages into the application loop, and actions back out of a screen.
 
 use protocols::lichen::{
-    locales::Locale,
+    install::DiscoveredModel,
+    locales::{Keymap, Locale},
     network::{AccessPoint, NetworkStatus},
     storage::{
         disks::Disk,
@@ -30,6 +31,14 @@ pub enum Msg {
     Disks(Vec<Disk>),
     /// Every strategy that produced a plan for the chosen disk and its plan
     Strategies(Vec<(StrategyDefinition, StrategyPlan)>),
+    /// A system-model left on the chosen disk by a previous installation,
+    /// or None when there is none to reuse.
+    Discovered(Option<DiscoveredModel>),
+    /// The keyboard layouts came back from the backend
+    Keymaps(Vec<Keymap>),
+    /// A layout took effect on the live session; None when the attempt failed
+    /// and the live keyboard is unchanged.
+    KeymapApplied(Option<Keymap>),
     /// The locale list came back from the backend
     Locales(Vec<Locale>),
     /// The current network state came back
@@ -38,8 +47,18 @@ pub enum Msg {
     AccessPoints(Vec<AccessPoint>),
     /// A wireless connection was establish, naming its profile
     WifiConnected(String),
-    InstallProgress(String),
+    /// A line from the running install, tagged with the phase it belongs to.
+    /// The phase is empty for output captured from a tool, which does not know
+    /// which phase it's in.
+    InstallProgress {
+        phase: String,
+        line: String,
+    },
+    /// The animation clock. Delivered like any other message, so a screen that
+    /// wants to animate just counts them; nothing else has to know.
+    Tick,
     InstallFinished,
+    InstallFailed(String),
 }
 
 /// What a screen tells the applicaiton after seeing a key.

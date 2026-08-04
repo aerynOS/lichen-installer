@@ -204,7 +204,7 @@ impl FilterList {
             .collect();
 
         frame.render_stateful_widget(
-            List::new(items).highlight_style(SELECTED).highlight_symbol("▸ "),
+            List::new(items).highlight_style(SELECTED).highlight_symbol(CURSOR),
             body,
             &mut self.list,
         );

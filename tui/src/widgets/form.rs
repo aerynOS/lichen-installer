@@ -13,7 +13,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     layout::Rect,
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph},
 };
 
 /// Rows each field occupies: a bordered box around one line of text
@@ -87,7 +87,7 @@ impl Field {
     /// What is drawn: the value itself, or one bullet per character
     fn display(&self) -> String {
         if self.masked {
-            "•".repeat(self.len())
+            MASK.repeat(self.len())
         } else {
             self.value.clone()
         }
@@ -217,7 +217,6 @@ impl Form {
             let style = if focused { STEP_ACTIVE } else { FRAME };
             let block = Block::default()
                 .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
                 .border_style(style)
                 .title(Line::styled(format!(" {} ", field.label), style));
             let inner = block.inner(row);

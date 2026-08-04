@@ -39,7 +39,7 @@ impl Screen for Welcome {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("⏎", "begin")]
+        &[("Enter", "begin")]
     }
 
     fn is_complete(&self, _model: &Model) -> bool {

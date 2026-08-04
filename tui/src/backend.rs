@@ -12,6 +12,7 @@ use nix::unistd::Uid;
 use protocols::lichen::system::system_client::SystemClient;
 use std::{
     env,
+    fs::File,
     path::{Path, PathBuf},
     process::Stdio,
     time::{Duration, Instant},
@@ -24,6 +25,8 @@ use tonic::transport::Channel;
 
 /// The privileged half of the installer
 const BACKEND: &str = "lichen_backend";
+/// Where backend's raw stderr is parked while the TUI owns the screen
+const BACKEND_STDERR: &str = "/tmp/lichen-backend.stderr";
 
 /// Generous, because pkexec may be waiting on a typed password. A backend
 /// that dies is detected immediately regardless, so this is not a stall.
@@ -95,8 +98,21 @@ fn spawn(program: &Path) -> Result<Child> {
 
     // The backend logs to stdout as well as /tmp/lichen-backend.log, and
     // inheriting that would nuke the interface once the TUI takes the
-    // screen. stderr stays inherited so pkexec can talk to the user.
+    // screen.
+    //
+    // stderr has to go the same way, and not because of the backend itself:
+    // disks-rs prints straight to stderr from BlockDevice::discover and from
+    // partitioning's writer, so probing partitions or applying a strategy
+    // paints hundres of lines over the alternate screen. ratatui diffs against
+    // what it drew, so cells someone else overwrote a never repainted until a
+    // window resize forces a full redraw. pkexec is unaffected: its text agent talks
+    // to /dev/tty rather than stderr, and the prompt happens before ratatui::init
     command.stdout(Stdio::null());
+    match File::create(BACKEND_STDERR) {
+        Ok(file) => command.stderr(Stdio::from(file)),
+        // Losing that output is survivable; painting over the interface is not.
+        Err(_) => command.stderr(Stdio::null()),
+    };
 
     command
         .spawn()

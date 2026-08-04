@@ -2,11 +2,13 @@
 members = [
     "backend",
     "cli",
-    "crates/*"
-, "tui"]
+    "crates/*",
+    "tui",
+]
 default-members = [
     "backend",
-    "cli"
+    "cli",
+    "tui",
 ]
 resolver = "3"
 

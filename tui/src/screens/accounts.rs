@@ -142,7 +142,7 @@ impl Screen for Accounts {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("↑↓", "field"), ("⏎", "next / submit")]
+        &[("↑↓", "field"), ("Enter", "next / submit")]
     }
 
     fn is_complete(&self, model: &Model) -> bool {

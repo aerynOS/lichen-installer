@@ -347,11 +347,10 @@ pub fn render_plan(plan: &StrategyPlan) -> String {
             }
         });
 
-        if root_btrfs && !has_home {
-            if let Some(device) = root_device {
+        if root_btrfs && !has_home
+            && let Some(device) = root_device {
                 out.push_str(&format!("  /home <- {device} (subvol=@home)\n"));
             }
-        }
     }
 
     out

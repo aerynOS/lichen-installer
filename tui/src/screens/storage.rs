@@ -84,7 +84,7 @@ impl Screen for Storage {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("↑↓", "choose"), ("⏎", "select")]
+        &[("↑↓", "choose"), ("Enter", "select")]
     }
 
     fn is_complete(&self, model: &Model) -> bool {
@@ -188,7 +188,7 @@ impl Screen for Storage {
         let items: Vec<ListItem<'_>> = self.disks().iter().map(|disk| ListItem::new(entry(disk))).collect();
 
         frame.render_stateful_widget(
-            List::new(items).highlight_style(SELECTED).highlight_symbol("▸ "),
+            List::new(items).highlight_style(SELECTED).highlight_symbol(CURSOR),
             body,
             &mut self.list,
         );

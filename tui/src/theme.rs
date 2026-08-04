@@ -38,3 +38,18 @@ pub const WARNING: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier:
 pub const ERROR: Style = Style::new().fg(Color::Red).add_modifier(Modifier::BOLD);
 /// Confirmation that something succeeded
 pub const SUCCESS: Style = Style::new().fg(Color::Green).add_modifier(Modifier::BOLD);
+
+// Installer glyphs
+
+/// Marks the row a list has selected. CP473 0x10.
+pub const CURSOR: &str = "► ";
+/// A step whose choices have been made. CP473 0xFB, the DOS tick.
+pub const COMPLETE: &str = "√";
+/// The step currently on screen. CP473 0xFA.
+pub const ACTIVE: &str = "·";
+/// Stands in for one character of a masked field.
+pub const MASK: &str = "*";
+/// One bar of a signal strength meter. CP473 0xDB.
+pub const BAR: &str = "█";
+/// Heartbeat animation
+pub const HEARTBEAT: [&str; 9] = ["-", "-", "=", "≡", "■", "≡", "=", "-", "-"];

@@ -51,7 +51,7 @@ impl Screen for Desktop {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("type", "filter"), ("↑↓", "choose"), ("⏎", "select")]
+        &[("type", "filter"), ("↑↓", "choose"), ("Enter", "select")]
     }
 
     fn is_complete(&self, model: &Model) -> bool {

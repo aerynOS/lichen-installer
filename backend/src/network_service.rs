@@ -9,7 +9,7 @@ use protocols::lichen::network::{
     AccessPoint, ConnectWifiRequest, ConnectWifiResponse, Device, NetworkStatus, ScanWifiResponse,
     network_server::{Network, NetworkServer},
 };
-use std::sync::Arc;
+use std::{cmp::Reverse, sync::Arc};
 use tokio::{
     process::Command,
     time::{Duration, sleep},
@@ -62,7 +62,7 @@ async fn run(program: &str, args: &[&str]) -> Result<String, Status> {
 ///
 /// Values escape ':' as "\:" and '\' as "\\", so an SSID containing a colon
 /// survives the round trip. Splitting natively would corrupt it.
-fn split_terse(line: &str) -> Vec<String> {
+pub(crate) fn split_terse(line: &str) -> Vec<String> {
     let mut fields = vec![String::new()];
     let mut escaped = false;
 
@@ -168,7 +168,7 @@ impl Network for Service {
             }
         }
 
-        access_points.sort_by(|a, b| b.signal.cmp(&a.signal));
+        access_points.sort_by_key(|b| Reverse(b.signal));
 
         Ok(Response::new(ScanWifiResponse { access_points }))
     }

@@ -352,7 +352,7 @@ impl Network {
         let items: Vec<ListItem<'_>> = self.points.iter().map(|point| ListItem::new(entry(point))).collect();
 
         frame.render_stateful_widget(
-            List::new(items).highlight_style(SELECTED).highlight_symbol("▸ "),
+            List::new(items).highlight_style(SELECTED).highlight_symbol(CURSOR),
             area,
             &mut self.list,
         );
@@ -366,8 +366,8 @@ impl Screen for Network {
 
     fn hints(&self) -> &[(&str, &str)] {
         match self.stage {
-            Stage::Networks => &[("↑↓", "choose"), ("⏎", "connect"), ("r", "rescan"), ("h", "hidden")],
-            Stage::Password | Stage::Hidden => &[("⏎", "connect"), ("Esc", "back")],
+            Stage::Networks => &[("↑↓", "choose"), ("Enter", "connect"), ("r", "rescan"), ("h", "hidden")],
+            Stage::Password | Stage::Hidden => &[("Enter", "connect"), ("Esc", "back")],
             Stage::Loading | Stage::Connecting => &[],
         }
     }
@@ -529,5 +529,5 @@ fn entry(point: &AccessPoint) -> Line<'static> {
 /// this survives a bare TTY as well as a terminal emulator.
 fn bars(signal: u32) -> String {
     let filled = (signal as usize).min(100).div_ceil(25);
-    format!("[{}{}]", "█".repeat(filled), " ".repeat(4 - filled))
+    format!("[{}{}]", BAR.repeat(filled), " ".repeat(4 - filled))
 }

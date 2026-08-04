@@ -42,7 +42,7 @@ impl Screen for Timezone {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("type", "filter"), ("↑↓", "choose"), ("⏎", "select")]
+        &[("type", "filter"), ("↑↓", "choose"), ("Enter", "select")]
     }
 
     fn is_complete(&self, _model: &Model) -> bool {

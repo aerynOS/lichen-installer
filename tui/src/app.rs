@@ -7,7 +7,7 @@
 use crate::{
     events::{self, Action, Msg},
     screens::{
-        Context, Placeholder, Screen, accounts::Accounts, desktop::Desktop, install::Install, locale::Locale,
+        Context, Screen, accounts::Accounts, desktop::Desktop, install::Install, keyboard::Keyboard, locale::Locale,
         network::Network, storage::Storage, strategy::Strategy, summary::Summary, timezone::Timezone, welcome::Welcome,
     },
     theme::*,
@@ -22,7 +22,11 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
-use tokio::sync::mpsc::{UnboundedReceiver, unbounded_channel};
+use std::time::Duration;
+use tokio::{
+    sync::mpsc::{UnboundedReceiver, unbounded_channel},
+    time::interval,
+};
 use tonic::transport::Channel;
 
 /// Below this the layout cannot be drawn honestly, so it isn't drawn at all.
@@ -30,6 +34,7 @@ const MIN_WIDTH: u16 = 80;
 const MIN_HEIGHT: u16 = 24;
 /// Width of the step rail, including it border column
 const SIDEBAR_WIDTH: u16 = 16;
+const HEARTBEAT_PERIOD: Duration = Duration::from_millis(150);
 
 /// Where the installer is in its lifecycle.
 ///
@@ -46,8 +51,22 @@ pub enum Phase {
 enum Overlay {
     None,
     Quit,
+    Help,
     Error(String),
 }
+
+/// Keys that work on every screen, for the help overlay.
+///
+/// The per-screen half of that overlay is read from `Screen::hints`, which is
+/// also what the footer renders, so the two can never disagree.
+const GLOBAL_KEYS: &[(&str, &str)] = &[
+    ("Tab / PageDown", "next step"),
+    ("Shift+Tab / PageUp", "previous step"),
+    ("F1 / ?", "show the help"),
+    ("Esc", "close an overlay"),
+    ("Ctrl+P", "refresh screen"),
+    ("Ctrl+C", "quit the installer"),
+];
 
 pub struct App {
     ctx: Context,
@@ -58,6 +77,7 @@ pub struct App {
     phase: Phase,
     overlay: Overlay,
     rx: UnboundedReceiver<Msg>,
+    redraw: bool,
     quit: bool,
 }
 
@@ -74,6 +94,7 @@ impl App {
             .unwrap_or_else(|| "Unknown OS".into());
         let screens: Vec<Box<dyn Screen>> = vec![
             Box::new(Welcome::new(info)),
+            Box::new(Keyboard::new()),
             Box::new(Network::new()),
             Box::new(Storage::new()),
             Box::new(Strategy::new()),
@@ -94,6 +115,7 @@ impl App {
             phase: Phase::Choosing,
             overlay: Overlay::None,
             rx,
+            redraw: false,
             quit: false,
         }
     }
@@ -104,14 +126,26 @@ impl App {
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         self.screens[self.current].on_enter(&self.ctx, &self.model);
 
+        let mut heartbeat = interval(HEARTBEAT_PERIOD);
+
         while !self.quit {
+            // Anything that writes to the terminal while the TUI is running
+            // leaves cells it will never repaint on its own, because ratatui
+            // diffs against what it drew rather than agains the screen.
+            if self.redraw {
+                terminal.clear()?;
+                self.redraw = false;
+            }
+
             terminal.draw(|frame| self.render(frame))?;
 
-            let Some(msg) = self.rx.recv().await else {
-                break;
-            };
-
-            self.handle(msg);
+            tokio::select! {
+                msg = self.rx.recv() => match msg {
+                    Some(msg) => self.handle(msg),
+                    None => break,
+                },
+                _ = heartbeat.tick() => self.handle(Msg::Tick),
+            }
         }
 
         Ok(())
@@ -150,6 +184,25 @@ impl App {
             return;
         }
 
+        // The manual way out of a foreign output painted over the interface
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('p') {
+            self.redraw = true;
+            return;
+        }
+
+        // Toggle the help overlay
+        match (key.code, &self.overlay) {
+            (KeyCode::F(1), Overlay::None) => {
+                self.overlay = Overlay::Help;
+                return;
+            }
+            (KeyCode::F(1), Overlay::Help) => {
+                self.overlay = Overlay::None;
+                return;
+            }
+            _ => {}
+        }
+
         if !matches!(self.overlay, Overlay::None) {
             self.on_overlay_key(key);
             return;
@@ -172,6 +225,7 @@ impl App {
         match (&self.overlay, key.code) {
             (Overlay::Quit, KeyCode::Char('y' | 'Y')) => self.quit = true,
             (Overlay::Quit, KeyCode::Esc | KeyCode::Char('n' | 'N')) => self.overlay = Overlay::None,
+            (Overlay::Help, KeyCode::Esc | KeyCode::Enter) => self.overlay = Overlay::None,
             (Overlay::Error(_), KeyCode::Esc | KeyCode::Enter) => self.overlay = Overlay::None,
             _ => {}
         }
@@ -182,6 +236,7 @@ impl App {
         match key.code {
             KeyCode::Tab | KeyCode::PageDown => self.next(),
             KeyCode::BackTab | KeyCode::PageUp => self.back(),
+            KeyCode::Char('?') => self.overlay = Overlay::Help,
             _ => {}
         }
     }
@@ -259,9 +314,9 @@ impl App {
             .enumerate()
             .map(|(index, screen)| {
                 let (marker, style) = if index == self.current {
-                    ("·", STEP_ACTIVE)
+                    (ACTIVE, STEP_ACTIVE)
                 } else if screen.is_complete(&self.model) {
-                    ("✔", STEP_COMPLETE)
+                    (COMPLETE, STEP_COMPLETE)
                 } else {
                     (" ", STEP_PENDING)
                 };
@@ -274,7 +329,7 @@ impl App {
     }
 
     fn render_content(&mut self, frame: &mut Frame<'_>, area: Rect) {
-        // Breathing room on the lef,t none stolen from the right edge
+        // Breathing room on the left none stolen from the right edge
         let padded = Rect {
             x: area.x + 2,
             y: area.y + 1,
@@ -288,7 +343,8 @@ impl App {
     fn render_footer(&self, frame: &mut Frame<'_>, area: Rect) {
         let line = match &self.overlay {
             Overlay::Quit => Line::styled(" y quit · Esc to continue ", HINT),
-            Overlay::Error(_) => Line::styled("Esc dismiss ", HINT),
+            Overlay::Help => Line::styled(" Esc close ", HINT),
+            Overlay::Error(_) => Line::styled(" Esc dismiss ", HINT),
             Overlay::None => {
                 let mut spans = vec![Span::raw(" ")];
 
@@ -297,8 +353,16 @@ impl App {
                     spans.push(Span::styled(format!(" {meaning} · "), HINT));
                 }
 
-                spans.push(Span::styled("Tab/⇧Tab", STEP_ACTIVE));
-                spans.push(Span::styled(" step · ", HINT));
+                // Past the commit the step keys do nothing. Advertising them
+                // invites the user to press them and not trust the installer.
+                if self.phase == Phase::Choosing {
+                    spans.push(Span::styled("Tab", STEP_ACTIVE));
+                    spans.push(Span::styled(" next · ", HINT));
+                    spans.push(Span::styled("Shift+Tab", STEP_ACTIVE));
+                    spans.push(Span::styled(" back · ", HINT));
+                }
+                spans.push(Span::styled("F1", STEP_ACTIVE));
+                spans.push(Span::styled(" keys · ", HINT));
                 spans.push(Span::styled("Ctrl+C", STEP_ACTIVE));
                 spans.push(Span::styled(" quit ", HINT));
                 Line::from(spans)
@@ -308,12 +372,50 @@ impl App {
         frame.render_widget(Paragraph::new(line), area);
     }
 
+    fn render_help(&self, frame: &mut Frame<'_>, area: Rect) {
+        let screen = &self.screens[self.current];
+        let mut lines = vec![Line::styled("Anywhere", HEADING)];
+
+        lines.extend(GLOBAL_KEYS.iter().map(|(key, meaning)| help_row(key, meaning)));
+
+        if !screen.hints().is_empty() {
+            lines.push(Line::raw(""));
+            lines.push(Line::styled(screen.title(), HEADING));
+            lines.extend(screen.hints().iter().map(|(key, meaning)| help_row(key, meaning)));
+        }
+
+        let popup = centered(area, 50, 70);
+
+        frame.render_widget(Clear, popup);
+        frame.render_widget(
+            Paragraph::new(lines).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(FRAME)
+                    .title(Line::styled(" Keys ", TITLE)),
+            ),
+            popup,
+        );
+    }
+
     fn render_overlay(&self, frame: &mut Frame<'_>, area: Rect) {
+        if matches!(self.overlay, Overlay::Help) {
+            self.render_help(frame, area);
+            return;
+        }
+
         let (title, body, style) = match &self.overlay {
-            Overlay::None => return,
+            Overlay::None | Overlay::Help => return,
             Overlay::Quit => (
                 " Quit the installer? ",
-                "Nothing has been written to disk.\n\nPress y to quit, Esc to continue".to_string(),
+                match self.phase {
+                    Phase::Choosing => "Nothing has been written to disk.\n\nPress y to quit, Esc to continue",
+                    Phase::Committed => {
+                        "The disk has already been written to. Quitting now leaves an unfinished \
+                        installation behind.\n\nPress y to quit, Esc to continue"
+                    }
+                }
+                .to_string(),
                 WARNING,
             ),
             Overlay::Error(reason) => (" Something went wrong ", reason.clone(), ERROR),
@@ -350,4 +452,12 @@ fn centered(area: Rect, percent_x: u16, percent_y: u16) -> Rect {
     .areas(middle);
 
     center
+}
+
+/// One key and what it does, in two columns
+fn help_row(key: &str, meaning: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("  {key:<20}"), STEP_ACTIVE),
+        Span::styled(meaning.to_string(), BODY),
+    ])
 }

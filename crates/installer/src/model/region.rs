@@ -8,9 +8,14 @@
 pub struct Model {
     /// System language (i.e. "en_US")
     pub language: String,
-
     /// System timezone (i.e. "Europe/London")
     pub timezone: String,
+    /// X11 keyboard layout (i.e. "gb")
+    pub layout: String,
+    /// Console keymap the layout maps to (i.e. "uk"). Empty for the 57 of 99
+    /// layouts systemd has no console equivalent for; the console then falls
+    /// back to `us` while the graphical session still gets the right layout.
+    pub keymap: String,
 }
 
 impl Default for Model {
@@ -18,6 +23,8 @@ impl Default for Model {
         Self {
             language: String::from("en_US.UTF-8"),
             timezone: String::from("UTC"),
+            layout: String::from("us"),
+            keymap: String::from("us"),
         }
     }
 }

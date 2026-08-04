@@ -35,9 +35,30 @@ message Locale {
   optional string codeset = 6;
 }
 
+// A keyboard layout the target can be configured with
+message Keymap {
+  // X11 layout code, i.e. "gb"
+  string layout = 1;
+
+  // Human readable description, i.e. "English (UK)"
+  string description = 2;
+
+  // Console keymap this layout maps to, i.e. "uk". Empty when the system
+  // offers no mapping for it.
+  string console = 3;
+}
+
 service Locales {
   rpc ListLocales(google.protobuf.Empty) returns (ListLocalesResponse) {}
   rpc GetLocale(GetLocaleRequest) returns (Locale) {}
+
+  // Keyboard layouts the target can be configured with.
+  rpc ListKeymaps(google.protobuf.Empty) returns (ListKeymapsResponse) {}
+  rpc GetKeymap(GetKeymapsRequest) returns (Keymap) {}
+
+  // Apply a layout to the running system, so that what the user types next
+  // matches what the installed system will do.
+  rpc SetKeymap(SetKeymapRequest) returns (SetKeymapResponse) {}
 }
 
 message ListLocalesResponse {
@@ -46,4 +67,27 @@ message ListLocalesResponse {
 
 message GetLocaleRequest {
   string name = 1;
+}
+
+message ListKeymapsResponse {
+  repeated Keymap keymaps = 1;
+}
+
+message GetKeymapsRequest {
+  // X11 layout code
+  string layout = 1;
+}
+
+message SetKeymapRequest {
+  // X11 layout code
+  string layout = 1;
+
+  // Console keymap; the backend applies both
+  string console = 2;
+}
+
+message SetKeymapResponse {
+  // What was actually applied. The console keymap can differe from the request
+  // when the system has no exact mapping for the chosen layout.
+  Keymap applied = 1;
 }

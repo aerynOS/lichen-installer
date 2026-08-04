@@ -81,6 +81,16 @@ message InstallSystemRequest {
 
   UserSpec user = 5;
   repeated RepoSpec repositories = 6;
+
+  // Console keymap for /etc/vconsole.conf. Empty for the 57 of 99
+  // layouts systemd has no console equivalent for.
+  string keymap = 7;
+
+  // X11 layout for /etc/X11/xorg.conf.d/00-keyboard.conf.
+  string x11_layout = 8;
+
+  // NetworkManager profile, or iwd network, to carry onto the target
+  optional string network_profile = 9;
 }
 
 // Progress update emitted during installation
@@ -90,6 +100,12 @@ message InstallProgress {
 
   // True on the final update of a successful installation
   bool finished = 2;
+
+  // Stable identifier for the phase now running: "mount", "index", "packages",
+  // "configure", or "unmount". Empty on keep-alive ticks an on lines captured from
+  // a subprecess, which does not know which phase it's in. Deliberately
+  // separate from `message` so that text stays free to be reworded.
+  string phase = 3;
 }
 
 // A package repository to prime into the target before syncing

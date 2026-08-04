@@ -126,6 +126,12 @@ pub async fn run(installer: &Installer, model: &mut Model) -> Result<(), StepErr
                 password_hash: user.password_hash.clone(),
             }),
             repositories,
+            // The CLI has no keyboard or network step yet; empty leaves the target's
+            // console, X11, and NetworkManager config exactly as the packages ship
+            // it, just as before these were added.
+            keymap: String::new(),
+            x11_layout: String::new(),
+            network_profile: None,
         })
         .await
     {

@@ -16,7 +16,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Wrap},
 };
 
 enum Stage {
@@ -76,6 +76,14 @@ impl Summary {
             row("Locale", model.region.language.clone()),
             row("Timezone", model.region.timezone.clone()),
             row(
+                "Keyboard",
+                if model.region.keymap.is_empty() {
+                    format!("{} (console fass back to us)", model.region.layout)
+                } else {
+                    format!("{} (console {})", model.region.layout, model.region.keymap)
+                },
+            ),
+            row(
                 "Desktop",
                 format!(
                     "{} ({} packages)",
@@ -111,7 +119,6 @@ impl Summary {
         let [prompt, _] = Layout::vertical([Constraint::Length(9), Constraint::Min(0)]).areas(area);
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
             .border_style(ERROR)
             .title(Line::styled(" Point of no return ", ERROR));
         let inner = block.inner(prompt);
@@ -194,7 +201,7 @@ impl Screen for Summary {
 
     fn hints(&self) -> &[(&str, &str)] {
         match self.stage {
-            Stage::Review => &[("↑↓", "scroll"), ("⏎", "install")],
+            Stage::Review => &[("↑↓", "scroll"), ("Enter", "install")],
             Stage::Confirm => &[("y", "erase and install"), ("n/Esc", "go back")],
         }
     }

@@ -44,7 +44,7 @@ impl Screen for Locale {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("type", "filter"), ("↑↓", "choose"), ("⏎", "select")]
+        &[("type", "filter"), ("↑↓", "choose"), ("Enter", "select")]
     }
 
     fn is_complete(&self, _model: &Model) -> bool {
@@ -92,17 +92,11 @@ impl Screen for Locale {
         let entries = locales
             .iter()
             .map(|locale| {
-                let label = match locale
-                    .territory
-                    .as_ref()
-                    .map(|territory| territory.flag.as_str())
-                    .filter(|flag| !flag.is_empty())
-                {
-                    Some(flag) => format!("{flag} {}", locale.display_name),
-                    None => locale.display_name.clone(),
-                };
-
-                Entry::new(locale.name.clone().into(), label.into(), locale.name.clone().into())
+                Entry::new(
+                    locale.name.clone().into(),
+                    locale.display_name.clone().into(),
+                    locale.name.clone().into(),
+                )
             })
             .collect();
 
