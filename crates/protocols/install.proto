@@ -16,6 +16,11 @@ service Install {
   // Search attached disks for system-models left by previous installations
   rpc DiscoverSystemModels(google.protobuf.Empty) returns (DiscoverSystemModelsResponse) {}
 
+  // Fetch model KDL document from a URI. Privileged because smb:// and nfs://
+  // have to mount, and file:// and https:// ride along so the frontend never
+  // has to branch on scheme.
+  rpc FetchModel(FetchModelRequest) returns (FetchModelResponse) {}
+
   // Install the OS onto the provisioned target and configure it.
   // Requires the target mounts from an applied strategy; runs moss against
   // the target root using the system-model written by WriteSystemModel
@@ -36,6 +41,18 @@ message WriteSystemModelRequest {
 
 // Response message for WriteSystemModel
 message WriteSystemModelResponse {
+}
+
+// Request message for FetchModel
+message FetchModelRequest {
+  // file://, https://, smb://, or nfs://
+  string uri = 1;
+}
+
+// Response message for FetchModel
+message FetchModelResponse {
+  // Full text of the fetched document
+  string contents = 1;
 }
 
 // A system-model found on an existing filesystem

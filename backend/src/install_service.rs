@@ -5,13 +5,14 @@
 //! Install service: privileged operations for installing the target system
 
 pub mod btrfs;
+mod fetch;
 
 use crate::{auth::AuthService, install_service::btrfs::is_btrfs, network_service::split_terse};
 use disks::BlockDevice;
 use lichen_macros::authorized;
 use protocols::lichen::install::{
-    DiscoverSystemModelsResponse, DiscoveredModel, InstallProgress, InstallSystemRequest, TargetMount,
-    WriteSystemModelRequest, WriteSystemModelResponse,
+    DiscoverSystemModelsResponse, DiscoveredModel, FetchModelRequest, FetchModelResponse, InstallProgress,
+    InstallSystemRequest, TargetMount, WriteSystemModelRequest, WriteSystemModelResponse,
     install_server::{Install, InstallServer},
 };
 use std::{
@@ -123,6 +124,23 @@ impl Install for Service {
         let models = tokio::task::block_in_place(discover_models)?;
 
         Ok(Response::new(DiscoverSystemModelsResponse { models }))
+    }
+
+    #[authorized("com.aerynos.lichen.install.fetch-model")]
+    async fn fetch_model(
+        &self,
+        request: Request<FetchModelRequest>,
+    ) -> Result<Response<FetchModelResponse>, tonic::Status> {
+        let request = request.into_inner();
+        if request.uri.is_empty() {
+            return Err(Status::invalid_argument("no URI provided"));
+        }
+
+        info!(uri = %request.uri, "Fetching a model document");
+
+        let contents = fetch::fetch(&request.uri).await?;
+
+        Ok(Response::new(FetchModelResponse { contents }))
     }
 
     #[authorized("com.aerynos.lichen.install.system")]

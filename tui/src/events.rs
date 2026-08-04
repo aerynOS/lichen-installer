@@ -34,6 +34,11 @@ pub enum Msg {
     /// A system-model left on the chosen disk by a previous installation,
     /// or None when there is none to reuse.
     Discovered(Option<DiscoveredModel>),
+    /// A model document came back from FetchModel, with the URI it came from
+    ModelFetched {
+        uri: String,
+        contents: String,
+    },
     /// The keyboard layouts came back from the backend
     Keymaps(Vec<Keymap>),
     /// A layout took effect on the live session; None when the attempt failed
