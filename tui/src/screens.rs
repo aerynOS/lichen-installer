@@ -7,7 +7,6 @@
 pub mod accounts;
 pub mod desktop;
 pub mod install;
-pub mod keyboard;
 pub mod locale;
 pub mod network;
 pub mod storage;
@@ -16,12 +15,9 @@ pub mod summary;
 pub mod timezone;
 pub mod welcome;
 
-use crate::{
-    events::{Action, Msg},
-    theme::*,
-};
+use crate::events::{Action, Msg};
 use installer::Model;
-use ratatui::{Frame, crossterm::event::KeyEvent, layout::Rect, widgets::Paragraph};
+use ratatui::{Frame, crossterm::event::KeyEvent, layout::Rect};
 use std::future::Future;
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Status, transport::Channel};
@@ -83,34 +79,5 @@ pub trait Screen {
     /// Key hints for the footer, as (key, meaning) pairs.
     fn hints(&self) -> &[(&str, &str)] {
         &[]
-    }
-}
-
-/// Stand in for a step that has not been built yet, so the sidebar shows the
-/// whole journey from the first slice onward.
-pub struct Placeholder {
-    title: &'static str,
-}
-
-impl Placeholder {
-    pub fn new(title: &'static str) -> Self {
-        Self { title }
-    }
-}
-
-impl Screen for Placeholder {
-    fn title(&self) -> &str {
-        self.title
-    }
-
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, _model: &Model) {
-        frame.render_widget(
-            Paragraph::new(format!("{} - not built yet", self.title)).style(HINT),
-            area,
-        );
-    }
-
-    fn handle_key(&mut self, _key: KeyEvent, _model: &mut Model) -> Action {
-        Action::Ignored
     }
 }

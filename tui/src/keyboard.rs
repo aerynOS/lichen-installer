@@ -3,14 +3,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //! Keybord layout
-//!
-//! Applied to the live session the moment it is chosen rather than only written
-//! to the target: Accounts is three steps later, and a password typed on the
-//! wrong layout is one the user cannot type after the first reboot.
 
-use super::{Context, Screen};
 use crate::{
-    events::{Action, Msg},
+    events::Msg,
+    screens::Context,
     theme::*,
     widgets::{Entry, FilterList, Outcome},
 };
@@ -31,10 +27,12 @@ pub struct Keyboard {
     /// What actually took effect, which is not always what was asked for
     applied: Option<Keymap>,
     requested: bool,
-    chosen: bool,
     /// Cloned on entry: the apply RPC fires from a key press, and `handle_key`
     /// is given no context.
     ctx: Option<Context>,
+    /// The layout this picker last asked for. Compared against the model so an
+    /// import can be noticed without re-applying every frame.
+    current: String,
 }
 
 impl Keyboard {
@@ -44,9 +42,27 @@ impl Keyboard {
             available: Vec::new(),
             applied: None,
             requested: false,
-            chosen: false,
             ctx: None,
+            current: String::new(),
         }
+    }
+
+    /// Fetch the layouts once, at startup.
+    pub fn start(&mut self, ctx: &Context) {
+        if self.ctx.is_none() {
+            self.ctx = Some(ctx.clone());
+        }
+        if self.requested {
+            return;
+        }
+        self.requested = true;
+
+        let channel = ctx.channel.clone();
+
+        ctx.spawn(async move {
+            let keymaps = LocalesClient::new(channel).list_keymaps(()).await?.into_inner().keymaps;
+            Ok(Msg::Keymaps(keymaps))
+        });
     }
 
     /// Apply to the live session. A failure here is not fatal; the target
@@ -68,6 +84,45 @@ impl Keyboard {
                 Err(_) => None,
             }))
         });
+    }
+
+    /// Re-apply when an install-model.kdl changed the model's layout.
+    pub fn sync(&mut self, model: &Model) {
+        if self.available.is_empty() || self.current == model.region.layout {
+            return;
+        }
+
+        let layout = model.region.layout.clone();
+        let console = match model.region.keymap.is_empty() {
+            true => self.console_for(&layout),
+            false => model.region.keymap.clone(),
+        };
+        let entries = self
+            .available
+            .iter()
+            .map(|keymap| {
+                Entry::new(
+                    keymap.layout.clone().into(),
+                    keymap.description.clone().into(),
+                    keymap.layout.clone().into(),
+                )
+            })
+            .collect();
+
+        // FilterList can only be repositioned by being handed its entries again
+        self.list.set_entries(entries, &layout);
+        self.current = layout.clone();
+        self.apply(layout, console);
+    }
+
+    /// The console keymap a layout maps to, empty for the layouts systemd
+    /// has no equivalent for.
+    fn console_for(&self, layout: &str) -> String {
+        self.available
+            .iter()
+            .find(|keymap| keymap.layout == layout)
+            .map(|keymap| keymap.console.clone())
+            .unwrap_or_default()
     }
 
     fn status(&self) -> Line<'static> {
@@ -93,67 +148,28 @@ impl Keyboard {
             SUCCESS,
         )
     }
-}
 
-impl Screen for Keyboard {
-    fn title(&self) -> &str {
-        "Keyboard"
-    }
-
-    fn hints(&self) -> &[(&str, &str)] {
-        &[("type", "filter"), ("↑↓", "choose"), ("Enter", "select")]
-    }
-
-    fn is_complete(&self, _model: &Model) -> bool {
-        self.chosen
-    }
-
-    fn handle_key(&mut self, key: KeyEvent, model: &mut Model) -> Action {
+    /// Returns true when the overlay should close, which is the moment a
+    /// layout is picked.
+    pub fn handle_key(&mut self, key: KeyEvent, model: &mut Model) -> bool {
         match self.list.handle_key(key) {
             Outcome::Picked => {
                 let Some(entry) = self.list.selected() else {
-                    return Action::Consumed;
+                    return false;
                 };
                 let layout = entry.value.clone();
-                let console = self
-                    .available
-                    .iter()
-                    .find(|keymap| keymap.layout == layout)
-                    .map(|keymap| keymap.console.clone())
-                    .unwrap_or_default();
+                let console = self.console_for(&layout);
 
                 model.region.layout = layout.clone();
                 model.region.keymap = console.clone();
-                self.chosen = true;
                 self.apply(layout, console);
-                Action::Next
+                true
             }
-            Outcome::Consumed => Action::Consumed,
-            Outcome::Ignored => Action::Ignored,
+            Outcome::Consumed | Outcome::Ignored => false,
         }
     }
 
-    fn on_enter(&mut self, ctx: &Context, _model: &Model) {
-        if self.ctx.is_none() {
-            self.ctx = Some(ctx.clone());
-        }
-
-        if self.requested {
-            return;
-        }
-
-        self.requested = true;
-
-        let channel = ctx.channel.clone();
-
-        ctx.spawn(async move {
-            let keymaps = LocalesClient::new(channel).list_keymaps(()).await?.into_inner().keymaps;
-
-            Ok(Msg::Keymaps(keymaps))
-        });
-    }
-
-    fn on_message(&mut self, msg: &Msg, model: &mut Model) {
+    pub fn on_message(&mut self, msg: &Msg, model: &Model) {
         match msg {
             Msg::Keymaps(keymaps) => {
                 let entries = keymaps
@@ -169,14 +185,23 @@ impl Screen for Keyboard {
 
                 self.list.set_entries(entries, &model.region.layout);
                 self.available = keymaps.clone();
-                self.chosen = model.imported;
+                self.current = model.region.layout.clone();
             }
             Msg::KeymapApplied(applied) => self.applied = applied.clone(),
             _ => {}
         }
     }
 
-    fn render(&mut self, frame: &mut Frame<'_>, area: Rect, _model: &Model) {
+    pub fn hints(&self) -> &[(&str, &str)] {
+        &[
+            ("type", "filter"),
+            ("↑↓", "choose"),
+            ("Enter", "select"),
+            ("Esc", "close"),
+        ]
+    }
+
+    pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let [heading, body] = Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(area);
 
         frame.render_widget(

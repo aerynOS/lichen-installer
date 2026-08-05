@@ -78,7 +78,7 @@ impl Summary {
             row(
                 "Keyboard",
                 if model.region.keymap.is_empty() {
-                    format!("{} (console fass back to us)", model.region.layout)
+                    format!("{} (console falls back to us)", model.region.layout)
                 } else {
                     format!("{} (console {})", model.region.layout, model.region.keymap)
                 },

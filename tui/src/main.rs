@@ -9,6 +9,7 @@ mod backend;
 mod events;
 mod filesystems;
 mod install_model;
+mod keyboard;
 mod plan;
 mod screens;
 mod selections;

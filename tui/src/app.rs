@@ -6,9 +6,10 @@
 
 use crate::{
     events::{self, Action, Msg},
+    keyboard::Keyboard,
     screens::{
-        Context, Screen, accounts::Accounts, desktop::Desktop, install::Install, keyboard::Keyboard, locale::Locale,
-        network::Network, storage::Storage, strategy::Strategy, summary::Summary, timezone::Timezone, welcome::Welcome,
+        Context, Screen, accounts::Accounts, desktop::Desktop, install::Install, locale::Locale, network::Network,
+        storage::Storage, strategy::Strategy, summary::Summary, timezone::Timezone, welcome::Welcome,
     },
     theme::*,
 };
@@ -52,6 +53,7 @@ enum Overlay {
     None,
     Quit,
     Help,
+    Keyboard,
     Error(String),
 }
 
@@ -63,6 +65,7 @@ const GLOBAL_KEYS: &[(&str, &str)] = &[
     ("Tab / PageDown", "next step"),
     ("Shift+Tab / PageUp", "previous step"),
     ("F1 / ?", "show the help"),
+    ("F2", "keyboard layout"),
     ("Esc", "close an overlay"),
     ("Ctrl+P", "refresh screen"),
     ("Ctrl+C", "quit the installer"),
@@ -74,8 +77,10 @@ pub struct App {
     model: Model,
     screens: Vec<Box<dyn Screen>>,
     current: usize,
+    goto: Option<usize>,
     phase: Phase,
     overlay: Overlay,
+    keyboard: Keyboard,
     rx: UnboundedReceiver<Msg>,
     redraw: bool,
     quit: bool,
@@ -94,7 +99,6 @@ impl App {
             .unwrap_or_else(|| "Unknown OS".into());
         let screens: Vec<Box<dyn Screen>> = vec![
             Box::new(Welcome::new(info)),
-            Box::new(Keyboard::new()),
             Box::new(Network::new()),
             Box::new(Storage::new()),
             Box::new(Strategy::new()),
@@ -112,8 +116,10 @@ impl App {
             model: Model::default(),
             screens,
             current: 0,
+            goto: None,
             phase: Phase::Choosing,
             overlay: Overlay::None,
+            keyboard: Keyboard::new(),
             rx,
             redraw: false,
             quit: false,
@@ -125,17 +131,21 @@ impl App {
     /// never spins.
     pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
         self.screens[self.current].on_enter(&self.ctx, &self.model);
+        self.keyboard.start(&self.ctx);
 
         let mut heartbeat = interval(HEARTBEAT_PERIOD);
 
         while !self.quit {
             // Anything that writes to the terminal while the TUI is running
             // leaves cells it will never repaint on its own, because ratatui
-            // diffs against what it drew rather than agains the screen.
+            // diffs against what it drew rather than against the screen.
             if self.redraw {
                 terminal.clear()?;
                 self.redraw = false;
             }
+
+            // Check to see if an imported install-model.kdl and sync the keyboard layout
+            self.keyboard.sync(&self.model);
 
             terminal.draw(|frame| self.render(frame))?;
 
@@ -171,6 +181,8 @@ impl App {
         self.screens.iter_mut().for_each(|screen| {
             screen.on_message(&msg, &mut self.model);
         });
+        self.keyboard.on_message(&msg, &self.model);
+        self.return_from_goto();
     }
 
     fn on_key(&mut self, key: KeyEvent) {
@@ -200,6 +212,14 @@ impl App {
                 self.overlay = Overlay::None;
                 return;
             }
+            (KeyCode::F(2), Overlay::None) => {
+                self.overlay = Overlay::Keyboard;
+                return;
+            }
+            (KeyCode::F(2), Overlay::Keyboard) => {
+                self.overlay = Overlay::None;
+                return;
+            }
             _ => {}
         }
 
@@ -211,7 +231,7 @@ impl App {
         match self.screens[self.current].handle_key(key, &mut self.model) {
             Action::Consumed => {}
             Action::Next => self.next(),
-            Action::Back => self.back(),
+            Action::Goto(title) => self.goto(title),
             Action::Ignored => self.on_global_key(key),
             Action::Commit => {
                 self.next();
@@ -222,6 +242,19 @@ impl App {
     }
 
     fn on_overlay_key(&mut self, key: KeyEvent) {
+        // The keyboard picker takes everything except Esc, because its
+        // filter box needs the letters. That's why it can't join the
+        // match below.
+        if matches!(self.overlay, Overlay::Keyboard) {
+            if key.code == KeyCode::Esc {
+                self.overlay = Overlay::None;
+                return;
+            }
+            if self.keyboard.handle_key(key, &mut self.model) {
+                self.overlay = Overlay::None;
+            }
+            return;
+        }
         match (&self.overlay, key.code) {
             (Overlay::Quit, KeyCode::Char('y' | 'Y')) => self.quit = true,
             (Overlay::Quit, KeyCode::Esc | KeyCode::Char('n' | 'N')) => self.overlay = Overlay::None,
@@ -243,6 +276,7 @@ impl App {
 
     fn next(&mut self) {
         if self.phase == Phase::Choosing && self.current + 1 < self.screens.len() {
+            self.goto = None;
             self.current += 1;
             self.screens[self.current].on_enter(&self.ctx, &self.model);
         }
@@ -250,9 +284,37 @@ impl App {
 
     fn back(&mut self) {
         if self.phase == Phase::Choosing && self.current > 0 {
+            self.goto = None;
             self.current -= 1;
             self.screens[self.current].on_enter(&self.ctx, &self.model);
         }
+    }
+
+    /// Go to a specific screen, identified by title
+    fn goto(&mut self, title: &str) {
+        let Some(target) = self.screens.iter().position(|screen| screen.title() == title) else {
+            return;
+        };
+        if target == self.current {
+            return;
+        }
+
+        self.goto = Some(self.current);
+        self.current = target;
+        self.screens[self.current].on_enter(&self.ctx, &self.model);
+    }
+
+    fn return_from_goto(&mut self) {
+        let Some(origin) = self.goto else {
+            return;
+        };
+        if !self.screens[self.current].is_complete(&self.model) {
+            return;
+        }
+
+        self.goto = None;
+        self.current = origin;
+        self.screens[self.current].on_enter(&self.ctx, &self.model);
     }
 
     fn render(&mut self, frame: &mut Frame<'_>) {
@@ -286,20 +348,38 @@ impl App {
     }
 
     fn render_header(&self, frame: &mut Frame<'_>, area: Rect) {
-        let line = Line::from(vec![
-            Span::styled(format!(" Install {} ", self.os_name), TITLE),
-            Span::styled(
-                format!(
-                    "· {} ({}/{})",
-                    self.screens[self.current].title(),
-                    self.current + 1,
-                    self.screens.len(),
-                ),
-                HINT,
-            ),
+        let layout = match self.model.region.layout.is_empty() {
+            true => "us",
+            false => &self.model.region.layout,
+        };
+        let style = if matches!(self.overlay, Overlay::Keyboard) {
+            STEP_ACTIVE
+        } else {
+            HINT
+        };
+        let selector = Line::from(vec![
+            Span::styled("F2", STEP_ACTIVE),
+            Span::styled(format!(" [{layout}] "), style),
         ]);
+        let [left, right] =
+            Layout::horizontal([Constraint::Min(1), Constraint::Length(selector.width() as u16)]).areas(area);
 
-        frame.render_widget(Paragraph::new(line), area);
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                Span::styled(format!("Install {} ", self.os_name), TITLE),
+                Span::styled(
+                    format!(
+                        "· {} ({}/{})",
+                        self.screens[self.current].title(),
+                        self.current + 1,
+                        self.screens.len(),
+                    ),
+                    HINT,
+                ),
+            ])),
+            left,
+        );
+        frame.render_widget(Paragraph::new(selector).right_aligned(), right);
     }
 
     fn render_sidebar(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -344,6 +424,14 @@ impl App {
         let line = match &self.overlay {
             Overlay::Quit => Line::styled(" y quit · Esc to continue ", HINT),
             Overlay::Help => Line::styled(" Esc close ", HINT),
+            Overlay::Keyboard => {
+                let mut spans = vec![Span::raw(" ")];
+                for (key, meaning) in self.keyboard.hints() {
+                    spans.push(Span::styled(*key, STEP_ACTIVE));
+                    spans.push(Span::styled(format!(" {meaning} · "), HINT));
+                }
+                Line::from(spans)
+            }
             Overlay::Error(_) => Line::styled(" Esc dismiss ", HINT),
             Overlay::None => {
                 let mut spans = vec![Span::raw(" ")];
@@ -372,6 +460,19 @@ impl App {
         frame.render_widget(Paragraph::new(line), area);
     }
 
+    fn render_keyboard(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        let popup = centered(area, 60, 70);
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(FRAME)
+            .title(Line::styled(" Keyboard layout ", TITLE));
+        let inner = block.inner(popup);
+
+        frame.render_widget(Clear, popup);
+        frame.render_widget(block, popup);
+        self.keyboard.render(frame, inner);
+    }
+
     fn render_help(&self, frame: &mut Frame<'_>, area: Rect) {
         let screen = &self.screens[self.current];
         let mut lines = vec![Line::styled("Anywhere", HEADING)];
@@ -398,14 +499,21 @@ impl App {
         );
     }
 
-    fn render_overlay(&self, frame: &mut Frame<'_>, area: Rect) {
-        if matches!(self.overlay, Overlay::Help) {
-            self.render_help(frame, area);
-            return;
+    fn render_overlay(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        match self.overlay {
+            Overlay::Help => {
+                self.render_help(frame, area);
+                return;
+            }
+            Overlay::Keyboard => {
+                self.render_keyboard(frame, area);
+                return;
+            }
+            _ => {}
         }
 
         let (title, body, style) = match &self.overlay {
-            Overlay::None | Overlay::Help => return,
+            Overlay::None | Overlay::Help | Overlay::Keyboard => return,
             Overlay::Quit => (
                 " Quit the installer? ",
                 match self.phase {

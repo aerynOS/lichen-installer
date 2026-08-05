@@ -80,8 +80,8 @@ pub enum Action {
     Failed(String),
     /// Advance to the next step
     Next,
-    /// Return to the previous step
-    Back,
+    /// Go to the specified screen
+    Goto(&'static str),
     /// Confirmed at the summary, past this point the disk gets written
     Commit,
 }
