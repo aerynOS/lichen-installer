@@ -696,14 +696,11 @@ fn run(command: &mut Command) -> Result<(), Status> {
 
 /// Mount options and fsck pass for the target filesystem.
 ///
-/// bcachefs has no fsck helper following the fsck(8) exit protocol, so
-/// any non-zero pass drops the boot into emergency mode on a healthy
-/// filesystem. vfat carries no UNIX permissions, so without an explicit
+/// vfat carries no UNIX permissions, so without an explicit
 /// umask the ESP and XBOOTLDR contents are world readable.
 fn fstab_params(mountpoint: &str, fstype: &str, subvol: Option<&str>) -> (String, u8) {
     let (base, pass) = match (mountpoint, fstype) {
         (_, "btrfs") => ("defaults", 0u8),
-        ("/", "bcachefs") => ("defaults", 0),
         ("/", _) => ("defaults", 1),
         (_, "vfat") => ("defaults,umask=0077", 0),
         _ => ("defaults", 2),

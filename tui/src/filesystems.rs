@@ -17,14 +17,10 @@ pub const CHOICES: &[(&str, &str, &str)] = &[
     ("_f2fs", "f2fs", "Flash-friendly filesystem"),
     ("_ext4", "ext4", "The traditional Linux filesystem"),
     ("_btrfs", "btrfs", "Copy-on-write with checksumming"),
-    ("_bcachefs", "bcachefs", "Copy-on-write; needs a kernel-matched module"),
 ];
 
 /// Userspace packages the installed system needs for its root filesystem
-const FILESYSTEM_PACKAGES: &[(&str, &[&str])] = &[
-    ("btrfs", &["btrfs-progs", "udisks-btrfs"]),
-    ("bcachefs", &["bcachefs-tools", "bcachefs-module-stable"]),
-];
+const FILESYSTEM_PACKAGES: &[(&str, &[&str])] = &[("btrfs", &["btrfs-progs", "udisks-btrfs"])];
 
 /// A strategy id with any filesystem-variant suffix removed
 pub fn base(id: &str) -> &str {

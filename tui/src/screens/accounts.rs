@@ -21,7 +21,7 @@ use ratatui::{
     text::Line,
     widgets::Paragraph,
 };
-use sha_crypt::{ROUNDS_DEFAULT, Sha512Params, sha512_simple};
+use yescrypt::{PasswordHasher, Yescrypt};
 
 const REAL_NAME: usize = 0;
 const USERNAME: usize = 1;
@@ -220,6 +220,8 @@ fn check_username(username: &str) -> Result<(), &'static str> {
 }
 
 fn hash(plain: &str) -> Result<String, ()> {
-    let params = Sha512Params::new(ROUNDS_DEFAULT).map_err(|_| ())?;
-    sha512_simple(plain, &params).map_err(|_| ())
+    Yescrypt::default()
+        .hash_password(plain.as_bytes())
+        .map_err(|_| ())
+        .map(|hash| hash.to_string())
 }

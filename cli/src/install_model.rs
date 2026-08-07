@@ -330,11 +330,11 @@ mod tests {
             "pkgconfig(zlib)".to_string(),
             "firefox".to_string(),
         ];
-        model.accounts.root_password_hash = Some("$6$salt$roothash".to_string());
+        model.accounts.root_password_hash = Some("$y$j9T$abcdefghijklmnopqrstuvwx$roothashplaceholder".to_string());
         model.accounts.user = Some(User {
             username: "john".to_string(),
             real_name: "John Doe".to_string(),
-            password_hash: "$6$salt$userhash".to_string(),
+            password_hash: "$y$j9T$abcdefghijklmnopqrstuvwx$roothashplaceholder".to_string(),
         });
 
         model
@@ -358,12 +358,18 @@ mod tests {
                 "firefox".to_string(),
             ]
         );
-        assert_eq!(parsed.accounts.root_password_hash.as_deref(), Some("$6$salt$roothash"));
+        assert_eq!(
+            parsed.accounts.root_password_hash.as_deref(),
+            Some("$y$j9T$abcdefghijklmnopqrstuvwx$roothashplaceholder")
+        );
 
         let user = parsed.accounts.user.expect("user must round trip");
         assert_eq!(user.username, "john");
         assert_eq!(user.real_name, "John Doe");
-        assert_eq!(user.password_hash, "$6$salt$userhash");
+        assert_eq!(
+            user.password_hash,
+            "$y$j9T$abcdefghijklmnopqrstuvwx$roothashplaceholder"
+        );
     }
 
     #[test]

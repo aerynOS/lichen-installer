@@ -9,7 +9,7 @@ pub struct User {
     pub username: String,
     /// Real name, stored in the GECOS field
     pub real_name: String,
-    /// crypt(3) password hash
+    /// yescrypt password hash
     pub password_hash: String,
 }
 
@@ -19,7 +19,7 @@ pub struct User {
 /// be stored in the model.
 #[derive(Debug, Default)]
 pub struct Model {
-    /// crypt(3) hash of the root password
+    /// yescrypt hash of the root password
     pub root_password_hash: Option<String>,
     /// The primary admin account
     pub user: Option<User>,

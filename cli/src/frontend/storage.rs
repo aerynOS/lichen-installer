@@ -25,14 +25,10 @@ const FILESYSTEM_CHOICES: &[(&str, &str, &str)] = &[
     ("_f2fs", "f2fs", "Flash-friendly filesystem"),
     ("_ext4", "ext4", "The traditional Linux filesystem"),
     ("_btrfs", "btrfs", "Copy-on-write with checksumming"),
-    ("_bcachefs", "bcachefs", "Copy-on-write; needs a kernel-matched module"),
 ];
 
 /// Userspace packages the installed system needs for its root filesystem
-const FILESYSTEM_PACKAGES: &[(&str, &[&str])] = &[
-    ("btrfs", &["btrfs-progs", "udisks-btrfs"]),
-    ("bcachefs", &["bcachefs-tools", "bcachefs-module-stable"]),
-];
+const FILESYSTEM_PACKAGES: &[(&str, &[&str])] = &[("btrfs", &["btrfs-progs", "udisks-btrfs"])];
 
 pub async fn run(info: &OsInfo, installer: &Installer, model: &mut Model) -> Result<(), StepError> {
     // Grab the list of disks. Loopback devices stay hidden unless explicitly
@@ -347,10 +343,12 @@ pub fn render_plan(plan: &StrategyPlan) -> String {
             }
         });
 
-        if root_btrfs && !has_home
-            && let Some(device) = root_device {
-                out.push_str(&format!("  /home <- {device} (subvol=@home)\n"));
-            }
+        if root_btrfs
+            && !has_home
+            && let Some(device) = root_device
+        {
+            out.push_str(&format!("  /home <- {device} (subvol=@home)\n"));
+        }
     }
 
     out

@@ -19,11 +19,11 @@ color-eyre.workspace = true
 kdl.workspace = true
 nix = { workspace = true, features = ["user"] }
 ratatui = "0.30.2"
-sha-crypt.workspace = true
 tokio = { workspace = true, features = ["full"] }
 tonic = { workspace = true, features = ["transport"] }
 tracing.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter"] }
+yescrypt.workspace = true
 
 [lints]
 workspace = true

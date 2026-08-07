@@ -30,6 +30,7 @@ tracing-subscriber = { workspace = true, features = ["env-filter"] }
 tokio = { workspace = true, features = ["full"] }
 async-trait.workspace = true
 clap = { version = "4.6.4", features = ["derive"] }
+yescrypt.workspace = true
 
 [lints]
 workspace = true

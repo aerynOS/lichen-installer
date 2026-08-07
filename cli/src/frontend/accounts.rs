@@ -9,7 +9,7 @@
 
 use crate::{CliStep, FrontendStep};
 use installer::{DisplayInfo, Icon, Installer, Model, StepError, User, register_step};
-use sha_crypt::{ROUNDS_DEFAULT, Sha512Params, sha512_simple};
+use yescrypt::{PasswordHasher, Yescrypt};
 
 pub async fn run(_installer: &Installer, model: &mut Model) -> Result<(), StepError> {
     if model.accounts.root_password_hash.is_some() && model.accounts.user.is_some() {
@@ -84,10 +84,10 @@ fn ask_password(who: &str) -> Result<String, StepError> {
 }
 
 fn hash_password(plain: &str) -> Result<String, StepError> {
-    let params = Sha512Params::new(ROUNDS_DEFAULT)
-        .map_err(|_| StepError::Failed("invalid password hashing parameters".to_string()))?;
-
-    sha512_simple(plain, &params).map_err(|_| StepError::Failed("failed to hash password".to_string()))
+    Yescrypt::default()
+        .hash_password(plain.as_bytes())
+        .map_err(|_| StepError::Failed("failed to hash password".to_string()))
+        .map(|hash| hash.to_string())
 }
 
 register_step! {

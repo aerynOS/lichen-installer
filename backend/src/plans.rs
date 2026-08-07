@@ -103,8 +103,8 @@ pub(crate) fn apply_strategy(
     for (device, filesystem) in &plan.filesystems {
         info!(device = %device.display(), filesystem = ?filesystem, "creating filesystem");
 
-        // DiskWriter zeroes only the first 2MiB of a new partition. btrfs, xfs, and
-        // bcachefs keep superblock past that, and an unforced mkfs refuses to run
+        // DiskWriter zeroes only the first 2MiB of a new partition. btrfs and
+        // xfs keep superblock past that, and an unforced mkfs refuses to run
         // when it finds one, aborting after the disk has already been repartitioned.
         // Forcing is safe here only because the plan is user-confirmed before apply_strategy
         // is reached.
