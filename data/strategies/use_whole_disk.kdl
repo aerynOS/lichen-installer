@@ -11,14 +11,14 @@ strategy name="whole_disk_xfs" summary="Wipe and use entire disk" {
     // Create a partition table. Defaults to GPT
     create-partition-table type="gpt" disk="root_disk"
     
-    // 256 MiB ESP plus 3840 MiB XBOOTLDR is a flat 4 GiB of boot space, fixed
+    // 512 MiB ESP plus 3584 MiB XBOOTLDR is a flat 4 GiB of boot space, fixed
     // rather than ranged so every install has identical room for several
     // kernels and initrds regardless of disk size.
 
     // Create the ESP
     create-partition disk="root_disk" role="boot" id="esp" {
         constraints {
-            exactly (MiB)256
+            exactly (MiB)512
         }
         type (GUID)"efi-system-partition"
         filesystem {
@@ -30,7 +30,7 @@ strategy name="whole_disk_xfs" summary="Wipe and use entire disk" {
     // Create xbootldr
     create-partition disk="root_disk" role="extended-boot" id="xbootldr" {
         constraints {
-            exactly (MiB)3840
+            exactly (MiB)3584
         }
         type (GUID) "linux-extended-boot"
         filesystem {
@@ -63,7 +63,7 @@ strategy name="whole_disk_f2fs" summary="Wipe and use entire disk" {
 
     create-partition disk="root_disk" role="boot" id="esp" {
         constraints {
-            exactly (MiB)256
+            exactly (MiB)512
         }
         type (GUID)"efi-system-partition"
         filesystem {
@@ -74,7 +74,7 @@ strategy name="whole_disk_f2fs" summary="Wipe and use entire disk" {
 
     create-partition disk="root_disk" role="extended-boot" id="xbootldr" {
         constraints {
-            exactly (MiB)3840
+            exactly (MiB)3584
         }
         type (GUID)"linux-extended-boot"
         filesystem {
@@ -106,7 +106,7 @@ strategy name="whole_disk_ext4" summary="Wipe and use entire disk" {
 
     create-partition disk="root_disk" role="boot" id="esp" {
         constraints {
-            exactly (MiB)256
+            exactly (MiB)512
         }
         type (GUID)"efi-system-partition"
         filesystem {
@@ -117,7 +117,7 @@ strategy name="whole_disk_ext4" summary="Wipe and use entire disk" {
 
     create-partition disk="root_disk" role="extended-boot" id="xbootldr" {
         constraints {
-            exactly (MiB)3840
+            exactly (MiB)3584
         }
         type (GUID)"linux-extended-boot"
         filesystem {
@@ -149,7 +149,7 @@ strategy name="whole_disk_btrfs" summary="Wipe and use entire disk" {
 
     create-partition disk="root_disk" role="boot" id="esp" {
         constraints {
-            exactly (MiB)256
+            exactly (MiB)512
         }
         type (GUID)"efi-system-partition"
         filesystem {
@@ -160,7 +160,7 @@ strategy name="whole_disk_btrfs" summary="Wipe and use entire disk" {
 
     create-partition disk="root_disk" role="extended-boot" id="xbootldr" {
         constraints {
-            exactly (MiB)3840
+            exactly (MiB)3584
         }
         type (GUID)"linux-extended-boot"
         filesystem {

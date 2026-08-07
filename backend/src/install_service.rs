@@ -362,7 +362,7 @@ fn install_target(request: &InstallSystemRequest, progress: Progress<'_>) -> Res
         // integration, which is why the boot mounts must be live first
         progress("packages", "Installing packages".to_string());
         info!("Running moss sync against the target (this can take a while)");
-        run_streaming(
+        let sync_result = run_streaming(
             Command::new("moss")
                 .args(["sync", "--import"])
                 .arg(target.join(SYSTEM_MODEL_PATH))
@@ -371,7 +371,14 @@ fn install_target(request: &InstallSystemRequest, progress: Progress<'_>) -> Res
                 .arg("-u")
                 .arg("-y"),
             progress,
-        )?;
+        );
+
+        if let Err(ref err) = sync_result {
+            warn!("moss sync failed; attempting to clean vfat boot partitions before unmount: {err}");
+            fsck_vfat_mounts(target, &mounts)?;
+        }
+
+        sync_result?;
 
         progress("configure", "Configuring target system".to_string());
         configure_target(target, request)
@@ -383,9 +390,13 @@ fn install_target(request: &InstallSystemRequest, progress: Progress<'_>) -> Res
     // may reboot the moment this returns.
     progress("unmount", "Unmounting target filesystems".to_string());
     for mountpoint in mounted.iter().rev() {
-        let _ = run(Command::new("umount").arg(mountpoint));
+        let _ = run(Command::new("umount").args(["-l", mountpoint.to_str().expect("should have had a mountpoint")]));
     }
     let _ = run(&mut Command::new("sync"));
+
+    if result.is_err() {
+        warn!("Installation failed: the target disk may be in a partial or unbootable state; do not reboot!");
+    }
 
     result
 }
@@ -694,6 +705,20 @@ fn run(command: &mut Command) -> Result<(), Status> {
     Ok(())
 }
 
+/// Run fsck -a on all vfat boot partitions before unmounting after a failed
+/// install. This reduces the change a partial write leave the ESP or
+/// XBOOTLDR in a dirty state that the user then reboots into.
+fn fsck_vfat_mounts(target: &Path, mounts: &[ResolvedMount]) -> Result<(), Status> {
+    for mount in mounts.iter().filter(|mount| mount.fstype == "vfat") {
+        let mountpoint = target.join(mount.mountpoint.trim_start_matches('/'));
+        let _ = run(Command::new("fsck.vfat").args(["-a", "-w", &mountpoint.to_string_lossy()]));
+    }
+
+    // Non-fatal: if fsck cannot repair it, the install has already failed
+    // and the user must be told not to reboot.
+    Ok(())
+}
+
 /// Mount options and fsck pass for the target filesystem.
 ///
 /// vfat carries no UNIX permissions, so without an explicit
@@ -702,7 +727,11 @@ fn fstab_params(mountpoint: &str, fstype: &str, subvol: Option<&str>) -> (String
     let (base, pass) = match (mountpoint, fstype) {
         (_, "btrfs") => ("defaults", 0u8),
         ("/", _) => ("defaults", 1),
-        (_, "vfat") => ("defaults,umask=0077", 0),
+        // ESP and XBOOTLDR are vfat. Run fsck at boot: ESP first, XBOOTLDR
+        // second. `flush` added so metadata is pushed out more aggressively,
+        // reducing the dirty-state window across unclean shutdowns.
+        ("/efi", "vfat") => ("defaults,unmask=0077,flush", 1),
+        (_, "vfat") => ("defaults,umask=0077,flush", 2),
         _ => ("defaults", 2),
     };
     match subvol {
