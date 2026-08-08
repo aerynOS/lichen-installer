@@ -125,7 +125,7 @@ async fn main() -> Result<()> {
 
     let listener = UnixListener::bind("/run/lichen.sock")?;
     // Make it writable by everyone
-    let _ = std::fs::set_permissions("/run/lichen.sock", std::fs::Permissions::from_mode(0o666));
+    let _ = std::fs::set_permissions("/run/lichen.sock", std::fs::Permissions::from_mode(0o660));
 
     let uds_stream = UnixListenerStream::new(listener);
     let (send, recv) = unbounded_channel();
