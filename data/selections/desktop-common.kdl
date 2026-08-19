@@ -15,6 +15,7 @@ selection name="desktop-common" summary="Desktop base" description="Common infra
 		networkmanager-wifi
 		networkmanager-wwan
 		pipewire
+		plymouth
 		polkit
 		systemd-preset-aeryn-desktop
 		wireplumber

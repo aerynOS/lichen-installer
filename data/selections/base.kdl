@@ -4,13 +4,26 @@ selection name="base" summary="Base system" description="The base system for all
         dash
         moss
         sudo
+        bzip2
+        ca-certificates
+        curl
         dbus-broker
+        diffutils
         dracut
+        file
+        findutils
+        gawk
+        grep
+        gzip
         kmod
+        less
         linux-pam
         lvm2
+        nano
         ncurses
         ntpd-rs
+        procps
+        sed
         shadow
         systemd
         systemd-boot
@@ -18,9 +31,13 @@ selection name="base" summary="Base system" description="The base system for all
         systemd-preset-aeryn
         systemd-resolved
         systemd-udev
+        tar
         tzdata
         util-linux
         uutils-coreutils
+        vim
+        which
+        xz
         zstd
     }
 }
