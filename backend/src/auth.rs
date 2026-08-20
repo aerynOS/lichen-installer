@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use nix::libc::gid_t;
-use std::process::Command;
+use std::{fs, process::Command};
 use tokio::net::unix::{pid_t, uid_t};
 use tonic::{Request, Status, transport::server::UdsConnectInfo};
 use tracing::{info, warn};
@@ -34,14 +34,34 @@ pub fn uds_interceptor(mut request: Request<()>) -> Result<Request<()>, Status> 
     }
 }
 
+/// The process start time polkit wants, in clock ticks since boot.
+///
+/// Field 22 of `/proc/<pid>/stat`, read after the comm field, which is
+/// parenthesized and may itself contain spaces and brackets. So, everything
+/// through the last `)` has to be dropped before counting.
+fn start_time(pid: u32) -> Result<u64, Status> {
+    let stat = fs::read_to_string(format!("/proc/{pid}/stat"))
+        .map_err(|err| Status::internal(format!("cannot read /proc/{pid}/stat: {err}")))?;
+    let (_, fields) = stat
+        .rsplit_once(')')
+        .ok_or_else(|| Status::internal(format!("/proc/{pid}/stat is malformed")))?;
+
+    fields
+        .split_whitespace()
+        .nth(19)
+        .and_then(|value| value.parse().ok())
+        .ok_or_else(|| Status::internal(format!("no start time in /proc/{pid}/stat")))
+}
+
 /// Check authorization for an action using pkcheck
 fn check_authorization(action_id: &str, uid: u32, pid: u32) -> Result<bool, Status> {
+    let start_time = start_time(pid)?;
     let output = Command::new("pkcheck")
         .args([
             "--action-id",
             action_id,
             "--process",
-            &format!("{pid},{uid}"),
+            &format!("{pid},{start_time},{uid}"),
             "--allow-user-interaction",
         ])
         .output()

@@ -5,6 +5,7 @@
 //! Network configuration for the live system, over NetworkManager.
 
 use crate::auth::AuthService;
+use lichen_macros::authorized;
 use protocols::lichen::network::{
     AccessPoint, ConnectWifiRequest, ConnectWifiResponse, Device, NetworkStatus, ScanWifiResponse,
     network_server::{Network, NetworkServer},
@@ -18,12 +19,12 @@ use tonic::{Request, Response, Status};
 use tracing::info;
 
 pub struct Service {
-    _auth: Arc<AuthService>,
+    auth: Arc<AuthService>,
 }
 
 /// Creates a new gRPC server instance using the default Service implementation
 pub fn service(auth: Arc<AuthService>) -> NetworkServer<Service> {
-    NetworkServer::new(Service { _auth: auth })
+    NetworkServer::new(Service { auth })
 }
 
 /// Run nmcli and return its stdout.
@@ -95,7 +96,8 @@ fn field(fields: &[String], index: usize) -> String {
 #[tonic::async_trait]
 impl Network for Service {
     /// Current link and connectivity state
-    async fn status(&self, _request: Request<()>) -> Result<Response<NetworkStatus>, Status> {
+    #[authorized("com.aerynos.lichen.network.status")]
+    async fn status(&self, request: Request<()>) -> Result<Response<NetworkStatus>, Status> {
         let general = nmcli(&["-t", "-f", "STATE,CONNECTIVITY", "general"]).await?;
         let connectivity = field(&split_terse(general.lines().next().unwrap_or_default()), 1);
         let listing = nmcli(&["-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"]).await?;
@@ -125,7 +127,8 @@ impl Network for Service {
     }
 
     /// Rescan and list visible access points, strongest first
-    async fn scan_wifi(&self, _request: Request<()>) -> Result<Response<ScanWifiResponse>, Status> {
+    #[authorized("com.aerynos.lichen.network.scan")]
+    async fn scan_wifi(&self, request: Request<()>) -> Result<Response<ScanWifiResponse>, Status> {
         let listing = nmcli(&[
             "-t",
             "-f",
@@ -173,6 +176,7 @@ impl Network for Service {
         Ok(Response::new(ScanWifiResponse { access_points }))
     }
 
+    #[authorized("com.aerynos.lichen.network.connect")]
     async fn connect_wifi(
         &self,
         request: Request<ConnectWifiRequest>,

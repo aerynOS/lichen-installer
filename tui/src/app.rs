@@ -23,7 +23,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
-use std::time::Duration;
+use std::{process, time::Duration};
 use tokio::{
     sync::mpsc::{UnboundedReceiver, unbounded_channel},
     time::interval,
@@ -233,10 +233,7 @@ impl App {
             Action::Next => self.next(),
             Action::Goto(title) => self.goto(title),
             Action::Ignored => self.on_global_key(key),
-            Action::Commit => {
-                self.next();
-                self.phase = Phase::Committed;
-            }
+            Action::Commit => self.commit(),
             Action::Failed(err) => self.overlay = Overlay::Error(err),
         }
     }
@@ -274,8 +271,12 @@ impl App {
         }
     }
 
+    /// Step forward, but nver onto the last screen. That one writes to disk,
+    /// and is reached only by confirming the summary.
     fn next(&mut self) {
-        if self.phase == Phase::Choosing && self.current + 1 < self.screens.len() {
+        let last = self.screens.len() - 1;
+
+        if self.phase == Phase::Choosing && self.current + 1 < last {
             self.goto = None;
             self.current += 1;
             self.screens[self.current].on_enter(&self.ctx, &self.model);
@@ -314,6 +315,13 @@ impl App {
 
         self.goto = None;
         self.current = origin;
+        self.screens[self.current].on_enter(&self.ctx, &self.model);
+    }
+
+    fn commit(&mut self) {
+        self.phase = Phase::Committed;
+        self.goto = None;
+        self.current = self.screens.len() - 1;
         self.screens[self.current].on_enter(&self.ctx, &self.model);
     }
 
@@ -518,6 +526,13 @@ impl App {
                 " Quit the installer? ",
                 match self.phase {
                     Phase::Choosing => "Nothing has been written to disk.\n\nPress y to quit, Esc to continue",
+                    Phase::Committed
+                        if self.screens[self.current].title() == "Install"
+                            && self.screens[self.current].is_complete(&self.model) =>
+                    {
+                        self.quit = true;
+                        return;
+                    }
                     Phase::Committed => {
                         "The disk has already been written to. Quitting now leaves an unfinished \
                         installation behind.\n\nPress y to quit, Esc to continue"

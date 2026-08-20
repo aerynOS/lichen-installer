@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 use crate::auth::AuthService;
+use lichen_macros::authorized;
 use locales_rs::Registry;
 use protocols::lichen::locales::{
     GetKeymapsRequest, GetLocaleRequest, Keymap, ListKeymapsResponse, ListLocalesResponse, Locale, SetKeymapRequest,
@@ -24,7 +25,7 @@ const KBD_MODEL_MAP: &str = "/usr/share/systemd/kbd-model-map";
 
 /// System service for queries and shutdown
 pub struct Service {
-    _auth: Arc<AuthService>,
+    auth: Arc<AuthService>,
 
     // The locales registry
     registry: Registry,
@@ -57,7 +58,7 @@ pub async fn service(auth: Arc<AuthService>) -> color_eyre::Result<locales_serve
     }
 
     let server = locales_server::LocalesServer::new(Service {
-        _auth: auth,
+        auth,
         registry,
         locale_codes,
         keymaps,
@@ -69,7 +70,8 @@ pub async fn service(auth: Arc<AuthService>) -> color_eyre::Result<locales_serve
 #[tonic::async_trait]
 impl locales_server::Locales for Service {
     /// Lists all available locales on the system
-    async fn list_locales(&self, _request: Request<()>) -> Result<Response<ListLocalesResponse>, Status> {
+    #[authorized("com.aerynos.lichen.locales.list-locales")]
+    async fn list_locales(&self, request: Request<()>) -> Result<Response<ListLocalesResponse>, Status> {
         let locales = self
             .locale_codes
             .iter()
@@ -82,8 +84,9 @@ impl locales_server::Locales for Service {
     }
 
     /// Gets the locale details for a specific locale
-    async fn get_locale(&self, _request: Request<GetLocaleRequest>) -> Result<Response<Locale>, Status> {
-        let request = _request.into_inner();
+    #[authorized("com.aerynos.lichen.locales.get-locale")]
+    async fn get_locale(&self, request: Request<GetLocaleRequest>) -> Result<Response<Locale>, Status> {
+        let request = request.into_inner();
         let locale_code = request.name;
 
         match self.registry.locale(&locale_code) {
@@ -96,13 +99,15 @@ impl locales_server::Locales for Service {
     }
 
     /// Keyboard layouts the target can be configured with
-    async fn list_keymaps(&self, _reqeust: Request<()>) -> Result<Response<ListKeymapsResponse>, Status> {
+    #[authorized("com.aerynos.lichen.locales.list-keymaps")]
+    async fn list_keymaps(&self, request: Request<()>) -> Result<Response<ListKeymapsResponse>, Status> {
         Ok(Response::new(ListKeymapsResponse {
             keymaps: self.keymaps.clone(),
         }))
     }
 
     /// Reslove a single layout code
+    #[authorized("com.aerynos.lichen.locales.get-keymap")]
     async fn get_keymap(&self, request: Request<GetKeymapsRequest>) -> Result<Response<Keymap>, Status> {
         let layout = request.into_inner().layout;
 
@@ -115,6 +120,7 @@ impl locales_server::Locales for Service {
     }
 
     /// Apply a layout to the running system
+    #[authorized("com.aerynos.lichen.locales.set-keymap")]
     async fn set_keymap(&self, request: Request<SetKeymapRequest>) -> Result<Response<SetKeymapResponse>, Status> {
         let request = request.into_inner();
 
