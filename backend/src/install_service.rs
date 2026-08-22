@@ -724,26 +724,30 @@ fn fsck_vfat_mounts(target: &Path, mounts: &[ResolvedMount]) -> Result<(), Statu
 /// vfat carries no UNIX permissions, so without an explicit
 /// umask the ESP and XBOOTLDR contents are world readable.
 fn fstab_params(mountpoint: &str, fstype: &str, subvol: Option<&str>) -> (String, u8) {
-    let (base, pass) = match (mountpoint, fstype) {
-        (_, "btrfs") => ("defaults", 0u8),
+    let (options, pass) = match (mountpoint, fstype) {
+        (_, "btrfs") => (
+            if let Some(subvol) = subvol {
+                &format!("subvol={subvol},defaults,noatime,space_cache,autodefrag,compress=zstd")
+            } else {
+                "defaults,noatime,space_cache,autodefrag,compress=zstd"
+            },
+            0,
+        ),
         ("/", _) => ("defaults", 1),
         // ESP and XBOOTLDR are vfat. Run fsck at boot: ESP first, XBOOTLDR
         // second. `flush` added so metadata is pushed out more aggressively,
         // reducing the dirty-state window across unclean shutdowns.
-        ("/efi", "vfat") => ("defaults,unmask=0077,flush", 1),
+        ("/efi", "vfat") => ("defaults,umask=0077,flush", 1),
         (_, "vfat") => ("defaults,umask=0077,flush", 2),
         _ => ("defaults", 2),
     };
-    match subvol {
-        Some(subvol) => (format!("{base},subvol={subvol}"), pass),
-        None => (base.to_string(), pass),
-    }
+    (options.to_string(), pass)
 }
 
 fn write_fstab(target: &Path, request: &InstallSystemRequest) -> Result<(), Status> {
     let mounts = resolve_mounts(&request.mounts)?;
 
-    // A rootless fstable is worse than none: the initrd hands off to a system
+    // A rootless fs table is worse than none: the initrd hands off to a system
     // that can neither remount / nor find /boot.
     if !mounts.iter().any(|mount| mount.mountpoint == "/") {
         return Err(Status::internal("target has no root mount; refusing to write fstab"));
