@@ -80,4 +80,21 @@ pub trait Screen {
     fn hints(&self) -> &[(&str, &str)] {
         &[]
     }
+    /// Move focus inside a screen. False when there is nowhere further to go
+    /// in that direction, at which point the Prev/Next buttons take it.
+    ///
+    /// Defaulting to false means a single-stop screen needs no implementation:
+    /// Tab passes stright through to the buttons.
+    fn focus(&mut self, _forward: bool) -> bool {
+        false
+    }
+    /// The Next button was pressed. `Ignored` means the screen has no gate and
+    /// the step simply advances; anything else is the screen's own answer.
+    fn proceed(&mut self, _model: &mut Model) -> Action {
+        Action::Ignored
+    }
+    /// What the Next button reads
+    fn next_label(&self) -> &str {
+        "Next"
+    }
 }

@@ -140,6 +140,22 @@ impl Summary {
         frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
     }
 
+    /// Open the confirm. Shared by Enter on the review and by the Install
+    /// button, so both refuse the same way when something is still missing.
+    fn begin(&mut self, model: &Model) -> Action {
+        let missing = self.missing(model);
+
+        if !missing.is_empty() {
+            self.problem = Some(format!("Still needs {}", missing.join(", ")));
+            return Action::Consumed;
+        }
+
+        self.problem = None;
+        self.stage = Stage::Confirm;
+
+        Action::Consumed
+    }
+
     fn on_review_key(&mut self, key: KeyEvent, model: &Model) -> Action {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => {
@@ -162,18 +178,7 @@ impl Summary {
                 self.scroll = 0;
                 Action::Consumed
             }
-            KeyCode::Enter => {
-                let missing = self.missing(model);
-
-                if !missing.is_empty() {
-                    self.problem = Some(format!("Still needs {}", missing.join(", ")));
-                    return Action::Consumed;
-                }
-
-                self.problem = None;
-                self.stage = Stage::Confirm;
-                Action::Consumed
-            }
+            KeyCode::Enter => self.begin(model),
             _ => Action::Ignored,
         }
     }
@@ -214,6 +219,22 @@ impl Screen for Summary {
         match self.stage {
             Stage::Review => self.on_review_key(key, model),
             Stage::Confirm => self.on_confirm_key(key),
+        }
+    }
+
+    fn next_label(&self) -> &str {
+        "Install"
+    }
+
+    /// The Install button is the review's Enter: it opens the confirm, it does
+    /// not start the install. Only a typed `y` does that.
+    fn proceed(&mut self, model: &mut Model) -> Action {
+        match self.stage {
+            Stage::Review => self.begin(model),
+
+            // The confirm is already up; the button must not double as an
+            // answer to it.
+            Stage::Confirm => Action::Consumed,
         }
     }
 

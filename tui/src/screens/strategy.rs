@@ -332,7 +332,7 @@ impl Strategy {
         if let Err(error) = packages_for(model) {
             return Action::Failed(error.to_string());
         }
-        Action::Next
+        Action::Ready
     }
 }
 
@@ -343,8 +343,8 @@ impl Screen for Strategy {
 
     fn hints(&self) -> &[(&str, &str)] {
         match self.stage {
-            Stage::Approach => &[("↑↓", "choose"), ("⏎", "select")],
-            Stage::Filesystem => &[("↑↓", "choose"), ("⏎", "select"), ("Esc", "back")],
+            Stage::Approach => &[("↑↓", "choose"), ("Enter", "select")],
+            Stage::Filesystem => &[("↑↓", "choose"), ("Enter", "select"), ("Esc", "back")],
         }
     }
 

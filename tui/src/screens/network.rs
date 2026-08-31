@@ -215,6 +215,10 @@ impl Network {
         let Some(point) = self.selected() else {
             return Action::Consumed;
         };
+        if point.in_use {
+            return Action::Ready;
+        }
+
         let ssid = point.ssid.clone();
         let open = point.security.is_empty();
 
@@ -382,6 +386,18 @@ impl Screen for Network {
             Stage::Networks => self.on_list_key(key),
             Stage::Password => self.on_psk_key(key),
             Stage::Hidden => self.on_hidden_key(key),
+        }
+    }
+
+    /// Only the hidden-network form has one field to walk
+    fn focus(&mut self, forward: bool) -> bool {
+        if !matches!(self.stage, Stage::Hidden) {
+            return false;
+        }
+
+        match forward {
+            true => self.hidden.focus_next(),
+            false => self.hidden.focus_prev(),
         }
     }
 

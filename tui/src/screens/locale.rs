@@ -61,7 +61,7 @@ impl Screen for Locale {
                 model.region.language = entry.value.clone();
                 self.chosen = true;
 
-                Action::Next
+                Action::Ready
             }
             Outcome::Consumed => Action::Consumed,
             Outcome::Ignored => Action::Ignored,

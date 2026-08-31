@@ -74,7 +74,7 @@ impl Storage {
         // A plan computed for the previous disk says nothing about this one
         model.storage.plan = None;
 
-        Action::Next
+        Action::Ready
     }
 }
 

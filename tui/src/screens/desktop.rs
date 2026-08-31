@@ -70,7 +70,7 @@ impl Screen for Desktop {
                 // Derived here rather than the summary, so a selection that
                 // cannot be satisfied is reported while it can still be changed.
                 match packages_for(model) {
-                    Ok(()) => Action::Next,
+                    Ok(()) => Action::Ready,
                     Err(error) => Action::Failed(error.to_string()),
                 }
             }
