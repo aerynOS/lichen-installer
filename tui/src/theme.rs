@@ -32,6 +32,7 @@ pub const SELECTED: Style = Style::new()
     .fg(Color::Black)
     .bg(Color::Cyan)
     .add_modifier(Modifier::BOLD);
+pub const BUTTON: Style = Style::new().fg(Color::Cyan);
 /// Something the user must read before continuing
 pub const WARNING: Style = Style::new().fg(Color::Yellow).add_modifier(Modifier::BOLD);
 /// A failure

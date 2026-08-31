@@ -4,8 +4,7 @@
 
 //! A stack of labelled text fields.
 //!
-//! Fields are navigated with ↑↓ rather than Tab, so Tab keeps its global
-//! meaning of moving between installation steps.
+//! Tab and ↑↓ both walk the fields.
 
 use crate::theme::*;
 use ratatui::{
@@ -132,10 +131,32 @@ impl Form {
         self.set_value(index, "");
     }
 
+    pub fn focused(&self) -> usize {
+        self.focus
+    }
+
     pub fn focus_on(&mut self, index: usize) {
         if index < self.fields.len() {
             self.focus = index;
         }
+    }
+
+    pub fn focus_next(&mut self) -> bool {
+        if self.focus + 1 >= self.fields.len() {
+            return false;
+        }
+
+        self.focus += 1;
+        true
+    }
+
+    pub fn focus_prev(&mut self) -> bool {
+        if self.focus == 0 {
+            return false;
+        }
+
+        self.focus -= 1;
+        true
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Outcome {

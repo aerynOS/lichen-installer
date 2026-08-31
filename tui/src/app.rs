@@ -23,7 +23,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Block, Borders, Clear, Paragraph, Wrap},
 };
-use std::{process, time::Duration};
+use std::time::Duration;
 use tokio::{
     sync::mpsc::{UnboundedReceiver, unbounded_channel},
     time::interval,
@@ -62,14 +62,26 @@ enum Overlay {
 /// The per-screen half of that overlay is read from `Screen::hints`, which is
 /// also what the footer renders, so the two can never disagree.
 const GLOBAL_KEYS: &[(&str, &str)] = &[
-    ("Tab / PageDown", "next step"),
-    ("Shift+Tab / PageUp", "previous step"),
+    ("Tab", "move to the next field or button"),
+    ("Shift+Tab", "move back"),
+    ("Enter", "press the focused button"),
     ("F1 / ?", "show the help"),
     ("F2", "keyboard layout"),
     ("Esc", "close an overlay"),
     ("Ctrl+P", "refresh screen"),
     ("Ctrl+C", "quit the installer"),
 ];
+
+/// What Tab is currently moving through
+///
+/// `Screen` delegates to `Screen::focus`, which walks the screen's own stops and
+/// then declines; the two buttons take it form there.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Focus {
+    Screen,
+    Previous,
+    Next,
+}
 
 pub struct App {
     ctx: Context,
@@ -79,6 +91,7 @@ pub struct App {
     current: usize,
     goto: Option<usize>,
     phase: Phase,
+    focus: Focus,
     overlay: Overlay,
     keyboard: Keyboard,
     rx: UnboundedReceiver<Msg>,
@@ -118,6 +131,7 @@ impl App {
             current: 0,
             goto: None,
             phase: Phase::Choosing,
+            focus: Focus::Screen,
             overlay: Overlay::None,
             keyboard: Keyboard::new(),
             rx,
@@ -228,9 +242,27 @@ impl App {
             return;
         }
 
+        // Tab belongs to the application, ahead of the screen.
+        match key.code {
+            KeyCode::Tab => {
+                self.move_focus(true);
+                return;
+            }
+            KeyCode::BackTab => {
+                self.move_focus(false);
+                return;
+            }
+            _ => {}
+        }
+
+        if self.focus != Focus::Screen {
+            self.on_button_key(key);
+            return;
+        }
+
         match self.screens[self.current].handle_key(key, &mut self.model) {
             Action::Consumed => {}
-            Action::Next => self.next(),
+            Action::Ready => self.next(),
             Action::Goto(title) => self.goto(title),
             Action::Ignored => self.on_global_key(key),
             Action::Commit => self.commit(),
@@ -255,19 +287,75 @@ impl App {
         match (&self.overlay, key.code) {
             (Overlay::Quit, KeyCode::Char('y' | 'Y')) => self.quit = true,
             (Overlay::Quit, KeyCode::Esc | KeyCode::Char('n' | 'N')) => self.overlay = Overlay::None,
-            (Overlay::Help, KeyCode::Esc | KeyCode::Enter) => self.overlay = Overlay::None,
+            (Overlay::Help, KeyCode::Esc | KeyCode::Enter | KeyCode::Char('?')) => self.overlay = Overlay::None,
             (Overlay::Error(_), KeyCode::Esc | KeyCode::Enter) => self.overlay = Overlay::None,
             _ => {}
         }
     }
 
-    /// Keys the active screen did not want
-    fn on_global_key(&mut self, key: KeyEvent) {
+    /// Walk Screen -> Prev -> Next and back around.
+    ///
+    /// The screen gets first refusal, so a form walks its own fields before
+    /// the buttons see anything. Scren 0 has no Previous to stop on.
+    fn move_focus(&mut self, forward: bool) {
+        if self.phase == Phase::Committed {
+            return;
+        }
+
+        let has_previous = self.current > 0;
+
+        self.focus = match (self.focus, forward) {
+            (Focus::Screen, true) => match self.screens[self.current].focus(true) {
+                true => Focus::Screen,
+                false if has_previous => Focus::Previous,
+                false => Focus::Next,
+            },
+            (Focus::Previous, true) => Focus::Next,
+            (Focus::Next, true) => Focus::Screen,
+            (Focus::Screen, false) => match self.screens[self.current].focus(false) {
+                true => Focus::Screen,
+                false => Focus::Next,
+            },
+            (Focus::Previous, false) => Focus::Screen,
+            (Focus::Next, false) if has_previous => Focus::Previous,
+            (Focus::Next, false) => Focus::Screen,
+        }
+    }
+
+    /// Keys while a button has focus. Nothing reaches the screen.
+    fn on_button_key(&mut self, key: KeyEvent) {
         match key.code {
-            KeyCode::Tab | KeyCode::PageDown => self.next(),
-            KeyCode::BackTab | KeyCode::PageUp => self.back(),
+            KeyCode::Left | KeyCode::Up if self.current > 0 => self.focus = Focus::Previous,
+            KeyCode::Right | KeyCode::Down => self.focus = Focus::Next,
+            KeyCode::Esc => self.focus = Focus::Screen,
+            KeyCode::Enter | KeyCode::Char(' ') => self.press(),
             KeyCode::Char('?') => self.overlay = Overlay::Help,
             _ => {}
+        }
+    }
+
+    /// Activate the focused button. The screen gets to refuse Next, enforcing any gates.
+    fn press(&mut self) {
+        if self.focus == Focus::Previous {
+            self.back();
+            return;
+        }
+
+        match self.screens[self.current].proceed(&mut self.model) {
+            Action::Ignored | Action::Ready => self.next(),
+            // The screen took it and is showing something: a confirm to answer,
+            // or the field it just rejected. It needs the keyboard back.
+            Action::Consumed => self.focus = Focus::Screen,
+            Action::Commit => self.commit(),
+            Action::Goto(title) => self.goto(title),
+            Action::Failed(err) => self.overlay = Overlay::Error(err),
+        }
+    }
+
+    /// Keys the active screen did not want
+    fn on_global_key(&mut self, key: KeyEvent) {
+        if key.code == KeyCode::Char('?') {
+            self.overlay = Overlay::Help;
         }
     }
 
@@ -278,6 +366,7 @@ impl App {
 
         if self.phase == Phase::Choosing && self.current + 1 < last {
             self.goto = None;
+            self.focus = Focus::Screen;
             self.current += 1;
             self.screens[self.current].on_enter(&self.ctx, &self.model);
         }
@@ -286,6 +375,7 @@ impl App {
     fn back(&mut self) {
         if self.phase == Phase::Choosing && self.current > 0 {
             self.goto = None;
+            self.focus = Focus::Screen;
             self.current -= 1;
             self.screens[self.current].on_enter(&self.ctx, &self.model);
         }
@@ -301,6 +391,7 @@ impl App {
         }
 
         self.goto = Some(self.current);
+        self.focus = Focus::Screen;
         self.current = target;
         self.screens[self.current].on_enter(&self.ctx, &self.model);
     }
@@ -314,6 +405,7 @@ impl App {
         }
 
         self.goto = None;
+        self.focus = Focus::Screen;
         self.current = origin;
         self.screens[self.current].on_enter(&self.ctx, &self.model);
     }
@@ -321,6 +413,7 @@ impl App {
     fn commit(&mut self) {
         self.phase = Phase::Committed;
         self.goto = None;
+        self.focus = Focus::Screen;
         self.current = self.screens.len() - 1;
         self.screens[self.current].on_enter(&self.ctx, &self.model);
     }
@@ -425,7 +518,40 @@ impl App {
             height: area.height.saturating_sub(1),
         };
 
-        self.screens[self.current].render(frame, padded, &self.model);
+        // Past the commit there is nothing to navigate, so the install
+        // screen keeps the whole pane.
+        if self.phase == Phase::Committed {
+            self.screens[self.current].render(frame, padded, &self.model);
+            return;
+        }
+
+        let [body, footing] = Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).areas(padded);
+
+        self.screens[self.current].render(frame, body, &self.model);
+        self.render_buttons(frame, footing);
+    }
+
+    /// Previous and Next, right-aligned under the content.
+    fn render_buttons(&self, frame: &mut Frame<'_>, area: Rect) {
+        // A blank row above, so the buttons are not hard against the content
+        let row = Rect {
+            y: area.y + 1,
+            height: 1,
+            ..area
+        };
+        let mut spans = Vec::new();
+
+        if self.current > 0 {
+            spans.push(button("< Previous", self.focus == Focus::Previous));
+            spans.push(Span::raw("  "));
+        }
+
+        spans.push(button(
+            &format!("{} >", self.screens[self.current].next_label()),
+            self.focus == Focus::Next,
+        ));
+
+        frame.render_widget(Paragraph::new(Line::from(spans)).right_aligned(), row);
     }
 
     fn render_footer(&self, frame: &mut Frame<'_>, area: Rect) {
@@ -453,9 +579,9 @@ impl App {
                 // invites the user to press them and not trust the installer.
                 if self.phase == Phase::Choosing {
                     spans.push(Span::styled("Tab", STEP_ACTIVE));
-                    spans.push(Span::styled(" next · ", HINT));
-                    spans.push(Span::styled("Shift+Tab", STEP_ACTIVE));
-                    spans.push(Span::styled(" back · ", HINT));
+                    spans.push(Span::styled(" move · ", HINT));
+                    spans.push(Span::styled("Enter", STEP_ACTIVE));
+                    spans.push(Span::styled(" press · ", HINT));
                 }
                 spans.push(Span::styled("F1", STEP_ACTIVE));
                 spans.push(Span::styled(" keys · ", HINT));
@@ -583,4 +709,11 @@ fn help_row(key: &str, meaning: &str) -> Line<'static> {
         Span::styled(format!("  {key:<20}"), STEP_ACTIVE),
         Span::styled(meaning.to_string(), BODY),
     ])
+}
+
+/// One button, padded so the focus highlight has some body to it
+fn button(label: &str, focused: bool) -> Span<'static> {
+    let style = if focused { SELECTED } else { BUTTON };
+
+    Span::styled(format!("  {label}  "), style)
 }

@@ -35,6 +35,7 @@ pub struct Accounts {
     form: Form,
     problem: Option<String>,
     prefilled: bool,
+    hashes: Option<(String, String)>,
 }
 
 impl Accounts {
@@ -50,6 +51,7 @@ impl Accounts {
             ]),
             problem: None,
             prefilled: false,
+            hashes: None,
         }
     }
 
@@ -72,26 +74,31 @@ impl Accounts {
             return self.reject(problem, USERNAME);
         }
 
-        let existing_user = model.accounts.user.as_ref().map(|user| user.password_hash.clone());
-        let existing_root = model.accounts.root_password_hash.clone();
+        let (user_hash, root_hash) = match self.hashes.clone() {
+            Some(pair) => pair,
+            None => {
+                let existing_user = model.accounts.user.as_ref().map(|user| user.password_hash.clone());
+                let existing_root = model.accounts.root_password_hash.clone();
+                let user_hash = match self.resolve(&password, &confirm, existing_user, (PASSWORD, CONFIRM), "user") {
+                    Ok(hash) => hash,
+                    Err(action) => return action,
+                };
+                let root_hash = match self.resolve(
+                    &root,
+                    &root_confirm,
+                    existing_root,
+                    (ROOT_PASSWORD, ROOT_CONFIRM),
+                    "root",
+                ) {
+                    Ok(hash) => hash,
+                    Err(action) => return action,
+                };
 
-        let user_hash = match self.resolve(&password, &confirm, existing_user, (PASSWORD, CONFIRM), "user") {
-            Ok(hash) => hash,
-            Err(action) => {
-                return action;
+                (user_hash, root_hash)
             }
         };
-        let root_hash = match self.resolve(
-            &root,
-            &root_confirm,
-            existing_root,
-            (ROOT_PASSWORD, ROOT_CONFIRM),
-            "root",
-        ) {
-            Ok(hash) => hash,
-            Err(action) => return action,
-        };
 
+        self.hashes = Some((user_hash.clone(), root_hash.clone()));
         model.accounts.user = Some(User {
             username,
             real_name,
@@ -100,7 +107,7 @@ impl Accounts {
         model.accounts.root_password_hash = Some(root_hash);
         self.problem = None;
 
-        Action::Next
+        Action::Ready
     }
 
     /// One password pair into one hash.
@@ -142,7 +149,7 @@ impl Screen for Accounts {
     }
 
     fn hints(&self) -> &[(&str, &str)] {
-        &[("↑↓", "field"), ("Enter", "next / submit")]
+        &[("Tab / ↑↓", "field"), ("Enter", "next / submit")]
     }
 
     fn is_complete(&self, model: &Model) -> bool {
@@ -154,11 +161,30 @@ impl Screen for Accounts {
             FormOutcome::Submit => self.submit(model),
             FormOutcome::Edited => {
                 self.problem = None;
+
+                // A changed password has to be hashed again.
+                if matches!(self.form.focused(), PASSWORD | CONFIRM | ROOT_PASSWORD | ROOT_CONFIRM) {
+                    self.hashes = None;
+                }
+
                 Action::Consumed
             }
             FormOutcome::Moved => Action::Consumed,
             FormOutcome::Ignored => Action::Ignored,
         }
+    }
+
+    fn focus(&mut self, forward: bool) -> bool {
+        match forward {
+            true => self.form.focus_next(),
+            false => self.form.focus_prev(),
+        }
+    }
+
+    /// Leaving forward comes through here, so Tab can no longer walk off the screen
+    /// unchecked.
+    fn proceed(&mut self, model: &mut Model) -> Action {
+        self.submit(model)
     }
 
     fn on_enter(&mut self, _ctx: &Context, model: &Model) {

@@ -78,8 +78,8 @@ pub enum Action {
     Consumed,
     /// Action requested has failed
     Failed(String),
-    /// Advance to the next step
-    Next,
+    /// This screen is satisfied; advance to the next step
+    Ready,
     /// Go to the specified screen
     Goto(&'static str),
     /// Confirmed at the summary, past this point the disk gets written

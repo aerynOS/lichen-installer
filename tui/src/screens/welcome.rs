@@ -185,7 +185,7 @@ impl Welcome {
     /// The welcome text: begin, or go an import something first.
     fn on_intro_key(&mut self, key: KeyEvent, model: &mut Model) -> Action {
         match key.code {
-            KeyCode::Enter | KeyCode::Tab | KeyCode::PageDown => self.commit(model),
+            KeyCode::Enter => self.commit(model),
             KeyCode::Char('i' | 'I') => {
                 self.stage = Stage::Slots;
                 Action::Consumed
@@ -195,7 +195,7 @@ impl Welcome {
     }
 
     /// The two model slots: pick one, then choose how to fill it.
-    fn on_slots_key(&mut self, key: KeyEvent, model: &mut Model) -> Action {
+    fn on_slots_key(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Up | KeyCode::Char('k') => {
                 self.model_slots.select(Some(INSTALL_MODEL));
@@ -222,7 +222,6 @@ impl Welcome {
                 self.stage = Stage::Intro;
                 Action::Consumed
             }
-            KeyCode::Tab | KeyCode::PageDown => self.commit(model),
             _ => Action::Ignored,
         }
     }
@@ -284,7 +283,7 @@ impl Welcome {
     /// the user happened to fill first.
     fn commit(&mut self, model: &mut Model) -> Action {
         if self.documents.iter().all(Option::is_none) {
-            return Action::Next;
+            return Action::Ready;
         }
 
         if let Some(contents) = &self.documents[INSTALL_MODEL]
@@ -317,15 +316,15 @@ impl Welcome {
         model.software.packages = packages.into_iter().collect();
 
         // Applied once. Coming back to this screen and pressing Enter again must
-        // not undo choices made in betwee; `sources` stays for display.
+        // not undo choices made in between; `sources` stays for display.
         self.documents = [None, None];
-        Action::Next
+        Action::Ready
     }
 
     fn render_intro(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let loaded = self.sources.iter().filter(|source| source.is_some()).count();
         let import = match loaded {
-            0 => "to import an install-model or system-model first.",
+            0 => "to import an install-model.kdl and/or system-model.kdl first.",
             1 => "to review the model already loaded.",
             _ => "to review the models already loaded.",
         };
@@ -339,6 +338,17 @@ impl Welcome {
                  Until that point, every choice can be revisited.",
                 BODY,
             ),
+            Line::raw(""),
+            Line::from(vec![
+                Span::styled("Press ", BODY),
+                Span::styled("F2", STEP_ACTIVE),
+                Span::styled(" to change the keyboard layout. The one you pick is used ", BODY),
+                Span::styled("both here and on the installed system", HEADING),
+                Span::styled(
+                    ", so a password typed now will retype correctly after you reboot.",
+                    BODY,
+                ),
+            ]),
             Line::raw(""),
             Line::from(vec![
                 Span::styled("Press ", BODY),
@@ -438,11 +448,20 @@ impl Screen for Welcome {
     fn handle_key(&mut self, key: KeyEvent, model: &mut Model) -> Action {
         match self.stage {
             Stage::Intro => self.on_intro_key(key, model),
-            Stage::Slots => self.on_slots_key(key, model),
+            Stage::Slots => self.on_slots_key(key),
             Stage::Browsing => self.on_browser_key(key),
             Stage::Typing => self.on_typing_key(key),
             // Nothing to do but wait for the backend
             Stage::Fetching => Action::Consumed,
+        }
+    }
+
+    fn proceed(&mut self, model: &mut Model) -> Action {
+        match self.stage {
+            Stage::Intro | Stage::Slots => self.commit(model),
+            // Mid-import. Leaving now would drop a document that has not
+            // arrived yet, so the button waits until Esc backs out.
+            Stage::Browsing | Stage::Typing | Stage::Fetching => Action::Consumed,
         }
     }
 

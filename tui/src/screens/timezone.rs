@@ -58,7 +58,7 @@ impl Screen for Timezone {
 
                 model.region.timezone = entry.value.clone();
                 self.chosen = true;
-                Action::Next
+                Action::Ready
             }
             Outcome::Consumed => Action::Consumed,
             Outcome::Ignored => Action::Ignored,
