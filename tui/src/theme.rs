@@ -4,7 +4,7 @@
 
 //! Styles are defined here.
 //!
-//! Named ANSI colors only, deliberately: the installer runs on whatever
+//! Named ANSI colors only: the installer runs on whatever
 //! terminal the ISO happens to land in, and named colors honor the user's
 //! palette instead of fighting it. Screens must never build a `Style` inline;
 //! doing it in one place keeps all screens stylistically in sync.
@@ -12,7 +12,7 @@
 use ratatui::style::{Color, Modifier, Style};
 
 /// Borders and rules around the content
-pub const FRAME: Style = Style::new().fg(Color::DarkGray);
+pub const FRAME: Style = Style::new().fg(Color::Gray);
 /// The installer name in the header
 pub const TITLE: Style = Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD);
 /// Ordinary body text
@@ -20,9 +20,9 @@ pub const BODY: Style = Style::new();
 /// A heading inside the screen
 pub const HEADING: Style = Style::new().add_modifier(Modifier::BOLD);
 /// Secondary text: descriptions, sizes, key hints
-pub const HINT: Style = Style::new().fg(Color::DarkGray);
+pub const HINT: Style = Style::new().fg(Color::Gray);
 /// A step not yet visited
-pub const STEP_PENDING: Style = Style::new().fg(Color::DarkGray);
+pub const STEP_PENDING: Style = Style::new().fg(Color::Gray);
 /// A step whose choices have been made
 pub const STEP_COMPLETE: Style = Style::new().fg(Color::Green);
 /// The step currently on screen
