@@ -3,16 +3,13 @@
 //
 // SPDX-License-Identifier: MPL-2.0
 
-use std::sync::Arc;
-
-use lichen_macros::authorized;
-use protocols::lichen::system::{SystemShutdownResponse, SystemStatusResponse, system_server};
-use tokio::sync::mpsc::UnboundedSender;
-use tonic::Request;
-use tonic::Response;
-use tracing::warn;
-
 use crate::auth::AuthService;
+use lichen_macros::authorized;
+use protocols::lichen::system::{SystemRebootResponse, SystemShutdownResponse, SystemStatusResponse, system_server};
+use std::sync::Arc;
+use tokio::{process::Command, sync::mpsc::UnboundedSender};
+use tonic::{Request, Response};
+use tracing::warn;
 
 /// System service for queries and shutdown
 #[derive(Debug)]
@@ -51,6 +48,22 @@ impl system_server::System for Service {
         warn!("Shutting down the backend service");
 
         Ok(Response::new(response))
+    }
+
+    /// Reboot the machine, once the install has finished.
+    #[authorized("com.aerynos.lichen.system.reboot")]
+    async fn reboot(&self, request: Request<()>) -> Result<Response<SystemRebootResponse>, tonic::Status> {
+        warn!("Rebooting the machine");
+
+        // Not waited beyond the ask: systemd takes it from
+        // here, and this process is about to stop existing.
+        Command::new("systemctl")
+            .arg("reboot")
+            .status()
+            .await
+            .map_err(|err| tonic::Status::internal(format!("failed to reboot: {err}")))?;
+
+        Ok(Response::new(SystemRebootResponse { rebooting: true }))
     }
 
     /// Get the OS information

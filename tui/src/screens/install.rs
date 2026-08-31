@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: Copyright © 2026 AerynOS Developers
+// SPDX-FileCopyrightText: Copyright © 2026 aerynOS Developers
 //
 // SPDX-License-Identifier: MPL-2.0
 
@@ -21,12 +21,13 @@ use protocols::lichen::{
         InstallSystemRequest, RepoSpec, TargetMount, UserSpec, WriteSystemModelRequest, install_client::InstallClient,
     },
     storage::provisioner::{ApplyStrategyRequest, provisioner_client::ProvisionerClient},
+    system::system_client::SystemClient,
 };
 use ratatui::{
     Frame,
-    crossterm::event::KeyEvent,
+    crossterm::event::{KeyCode, KeyEvent},
     layout::{Constraint, Layout, Rect},
-    text::Line,
+    text::{Line, Span},
     widgets::{Gauge, Paragraph},
 };
 use tokio::sync::mpsc::UnboundedSender;
@@ -55,6 +56,13 @@ enum State {
     Failed,
 }
 
+/// The two ways out, once the install has finished
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Choice {
+    Reboot,
+    Quit,
+}
+
 /// Everything the install task needs, captured before it starts
 struct Job {
     channel: Channel,
@@ -79,6 +87,10 @@ pub struct Install {
     phase: usize,
     /// Animation clock, counted from `Msg::Tick`
     tick: usize,
+    /// Which of the two finished-install buttson has focus
+    choice: Choice,
+    /// Cloned on entry: the reboot RPC is fired from `handle_key`
+    ctx: Option<Context>,
 }
 
 impl Install {
@@ -89,6 +101,8 @@ impl Install {
             started: false,
             phase: 0,
             tick: 0,
+            choice: Choice::Reboot,
+            ctx: None,
         }
     }
 
@@ -133,6 +147,51 @@ impl Install {
             _ => PHASES.iter().take(self.phase).map(|(_, _, weight)| weight).sum(),
         }
     }
+
+    /// Ask the backend to reboot the machine.
+    fn reboot(&mut self) -> Action {
+        let Some(ctx) = self.ctx.clone() else {
+            return Action::Failed("not connected to the backend".to_string());
+        };
+        let channel = ctx.channel.clone();
+
+        ctx.spawn(async move {
+            SystemClient::new(channel).reboot(()).await?;
+
+            // Only reached if the machine did not reboot; a failure
+            // arrives as Msg::Failed and opens the error overlay.
+            Ok(Msg::Tick)
+        });
+
+        Action::Consumed
+    }
+
+    /// The tail is what matters in a live log, so scroll by dropping the head
+    fn render_log(&self, frame: &mut Frame<'_>, area: Rect) {
+        let start = self.log.len().saturating_sub(area.height as usize);
+        let lines: Vec<Line<'static>> = self.log[start..]
+            .iter()
+            .map(|line| Line::styled(line.clone(), BODY))
+            .collect();
+
+        frame.render_widget(Paragraph::new(lines), area);
+    }
+
+    /// The two ways out of a finished install
+    fn render_choices(&self, frame: &mut Frame<'_>, area: Rect) {
+        let row = Rect {
+            y: area.y + 1,
+            height: 1,
+            ..area
+        };
+        let line = Line::from(vec![
+            choice("Reboot now", self.choice == Choice::Reboot),
+            Span::raw("  "),
+            choice("Quit", self.choice == Choice::Quit),
+        ]);
+
+        frame.render_widget(Paragraph::new(line).right_aligned(), row);
+    }
 }
 
 impl Screen for Install {
@@ -144,12 +203,38 @@ impl Screen for Install {
         matches!(self.state, State::Done)
     }
 
-    fn handle_key(&mut self, _key: KeyEvent, _model: &mut Model) -> Action {
-        // Nothing here is cancellable and navigation is locked by the phase
-        Action::Consumed
+    fn hints(&self) -> &[(&str, &str)] {
+        match self.state {
+            State::Done => &[("←→", "choose"), ("Enter", "select")],
+            _ => &[],
+        }
+    }
+
+    fn handle_key(&mut self, key: KeyEvent, _model: &mut Model) -> Action {
+        // Nothing here is cancellable and navigation is locked by the phase.
+        // Only the finished state has anything to process
+        if !matches!(self.state, State::Done) {
+            return Action::Consumed;
+        }
+
+        match key.code {
+            KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
+                self.choice = match self.choice {
+                    Choice::Reboot => Choice::Quit,
+                    Choice::Quit => Choice::Reboot,
+                };
+                Action::Consumed
+            }
+            KeyCode::Enter => match self.choice {
+                Choice::Reboot => self.reboot(),
+                Choice::Quit => Action::Quit,
+            },
+            _ => Action::Consumed,
+        }
     }
 
     fn on_enter(&mut self, ctx: &Context, model: &Model) {
+        self.ctx = Some(ctx.clone());
         if self.started {
             return;
         }
@@ -214,16 +299,16 @@ impl Screen for Install {
         let [heading, bars, body] =
             Layout::vertical([Constraint::Length(3), Constraint::Length(3), Constraint::Min(1)]).areas(area);
         let (title, style) = match self.state {
-            State::Working => ("Installing AerynOS", HEADING),
+            State::Working => ("Installing aerynOS", HEADING),
             State::Done => (
-                "Get ready for the AerynOS, experience! It's now installed on your device!!!",
+                "Get ready for the aerynOS, experience! It's now installed on your device!!!",
                 SUCCESS,
             ),
             State::Failed => ("The installation failed", ERROR),
         };
         let note = match self.state {
             State::Working => format!("Writing to {}. Do not power off.", model.storage.disk),
-            State::Done => "You can now reboot into your new AerynOS installation!".to_string(),
+            State::Done => "Choose Reboot now to start boot into your newly installed system, or Quit to stay in the live environment".to_string(),
             State::Failed => "The disk may be in a partial state".to_string(),
         };
 
@@ -234,13 +319,16 @@ impl Screen for Install {
 
         self.render_progress(frame, bars);
 
-        // The tail is what matters in the live log, so scroll by dropping the head
-        let start = self.log.len().saturating_sub(body.height as usize);
-        let lines: Vec<Line<'static>> = self.log[start..]
-            .iter()
-            .map(|line| Line::styled(line.clone(), BODY))
-            .collect();
-        frame.render_widget(Paragraph::new(lines), body);
+        // Once it is finished, the way out matter more than the log tail
+        if matches!(self.state, State::Done) {
+            let [log, buttons] = Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).areas(body);
+
+            self.render_log(frame, log);
+            self.render_choices(frame, buttons);
+            return;
+        }
+
+        self.render_log(frame, body);
     }
 }
 
@@ -304,7 +392,7 @@ async fn run(job: &Job, tx: &UnboundedSender<Msg>) -> Result<(), Status> {
         })
         .collect();
 
-    progress("", "Installing AerynOS; this can take several minutes...".to_string());
+    progress("", "Installing aerynOS; this can take several minutes...".to_string());
 
     let mut stream = install
         .install_system(InstallSystemRequest {
@@ -352,4 +440,10 @@ fn bar_row(frame: &mut Frame<'_>, area: Rect, caption: &str, percent: u16, value
         bar,
     );
     frame.render_widget(Paragraph::new(Line::styled(value, BODY)).right_aligned(), value_area);
+}
+
+/// One, button padded so the focus highlight has some body to it
+fn choice(label: &str, focused: bool) -> Span<'static> {
+    let style = if focused { SELECTED } else { BUTTON };
+    Span::styled(format!("    {label}    "), style)
 }

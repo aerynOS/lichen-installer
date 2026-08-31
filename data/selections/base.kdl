@@ -33,6 +33,7 @@ selection name="base" summary="Base system" description="The base system for all
         systemd-udev
         tar
         tzdata
+        unzip
         util-linux
         uutils-coreutils
         vim
