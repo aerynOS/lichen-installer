@@ -244,11 +244,11 @@ impl App {
 
         // Tab belongs to the application, ahead of the screen.
         match key.code {
-            KeyCode::Tab => {
+            KeyCode::Tab if self.phase == Phase::Choosing => {
                 self.move_focus(true);
                 return;
             }
-            KeyCode::BackTab => {
+            KeyCode::BackTab if self.phase == Phase::Choosing => {
                 self.move_focus(false);
                 return;
             }
@@ -266,6 +266,7 @@ impl App {
             Action::Goto(title) => self.goto(title),
             Action::Ignored => self.on_global_key(key),
             Action::Commit => self.commit(),
+            Action::Quit => self.quit = true,
             Action::Failed(err) => self.overlay = Overlay::Error(err),
         }
     }
@@ -348,6 +349,7 @@ impl App {
             Action::Consumed => self.focus = Focus::Screen,
             Action::Commit => self.commit(),
             Action::Goto(title) => self.goto(title),
+            Action::Quit => self.quit = true,
             Action::Failed(err) => self.overlay = Overlay::Error(err),
         }
     }

@@ -13,6 +13,7 @@ import "google/protobuf/empty.proto";
 service System {
     rpc Status(google.protobuf.Empty) returns (SystemStatusResponse) {}
     rpc Shutdown(google.protobuf.Empty) returns (SystemShutdownResponse) {}
+    rpc Reboot(google.protobuf.Empty) returns (SystemRebootResponse) {}
     rpc GetOSInfo(google.protobuf.Empty) returns (lichen.osinfo.OSInfo) {}
 }
 
@@ -22,6 +23,11 @@ message SystemStatusResponse {
 }
 
 message SystemShutdownResponse {
-    // True if the system is shutting down
+    // True if the backend is shutting down
     bool shutting_down = 1;
+}
+
+message SystemRebootResponse {
+    // True if the machine is rebooting
+    bool rebooting = 1;
 }

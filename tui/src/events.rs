@@ -84,6 +84,8 @@ pub enum Action {
     Goto(&'static str),
     /// Confirmed at the summary, past this point the disk gets written
     Commit,
+    /// Leave the installer, `main` still does the proper teardown.
+    Quit,
 }
 
 /// How long the input thread waits before checking whether the app is gone
