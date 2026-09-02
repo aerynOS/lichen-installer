@@ -3,58 +3,9 @@ selection name="plasma" summary="KDE Plasma Desktop" description="The KDE deskto
         desktop-common
     }
     packages {
-        ark
-        "binary(sddm)"
-        bluedevil
+        "binary(plasmalogin)"
         branding-aeryn-plasma
-        breeze-gtk-theme
-        discover
-        dolphin
-        drkonqi
-        elisa
-        flatpak-kcm
-        gwenview
-        haruna
-        kaccounts-providers
-        kalk
-        kate
-        kclock
-        kde-cli-tools
-        kde-gtk-config
-        kdegraphics-thumbnailers
-        kdepim-addons
-        kdeplasma-addons
-        kinfocenter
-        kio-admin
-        kio-gdrive
-        kjournald
-        kmag
-        konsole
-        krdp
-        kscreen
-        ksshaskpass
-        kwallet-pam
-        kwalletmanager
-        kwrite
-        merkuro
-        milou
-        okular
-        partitionmanager
-        plasma-browser-integration
-        plasma-desktop
-        plasma-disks
-        plasma-nm
-        plasma-pa
-        plasma-systemmonitor
-        plasma-thunderbolt
-        plasma-welcome
-        plasma-workspace-wallpapers
-        plymouth-kcm
-        polkit-kde-agent
-        powerdevil
-        print-manager
-        sddm-kcm
-        skanlite
-        spectacle
+        pkgset-aeryn-plasma-minimal
+        pkgset-aeryn-plasma-recommended
     }
 }
