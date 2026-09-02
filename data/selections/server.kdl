@@ -4,7 +4,7 @@ selection name="server" summary="Headless server (EXPERTS ONLY)" description="No
     }
     packages {
         "binary(nmtui)"
-        networkmanager
         "sysbinary(sshd)"
+        networkmanager
     }
 }
