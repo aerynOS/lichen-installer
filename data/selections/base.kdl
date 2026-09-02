@@ -1,44 +1,48 @@
 selection name="base" summary="Base system" description="The base system for all AerynOS installations." {
     packages {
-        bash
-        dash
-        moss
-        sudo
-        bzip2
+        "binary(bash)"
+        "binary(dash)"
+        "binary(file)"
+        "binary(find)"
+        "binary(gawk)"
+        "binary(grep)"
+        "binary(gzip)"
+        "binary(less)"
+        "binary(moss)"
+        "binary(nano)"
+        "binary(ping)"
+        "binary(ps)"
+        "binary(python)"
+        "binary(screen)"
+        "binary(sed)"
+        "binary(setfont)"
+        "binary(ssh)"
+        "binary(sudo)"
+        "binary(tar)"
+        "binary(unzip)"
+        "binary(wget)"
+        "binary(which)"
+        "sysbinary(fsck.ext4)"
+        "sysbinary(fsck.f2fs)"
+        "sysbinary(fsck.xfs)"
+        bash-completion
         ca-certificates
-        curl
+        dbus
         dbus-broker
-        diffutils
-        dracut
-        file
-        findutils
-        gawk
-        grep
-        gzip
-        kmod
-        less
-        linux-pam
-        lvm2
-        nano
-        ncurses
-        ntpd-rs
-        procps
-        sed
+        dmidecode
+        hyperv-daemons
+        iproute2
+        pciutils
+        pkgset-aeryn-base
+        pkgset-aeryn-utilities
+        pkgset-aeryn-virtual
+        qemu-guest-agent
         shadow
+        spice-vdagent
         systemd
-        systemd-boot
-        systemd-coredump
-        systemd-preset-aeryn
-        systemd-resolved
-        systemd-udev
-        tar
         tzdata
-        unzip
+        usbutils
         util-linux
         uutils-coreutils
-        vim
-        which
-        xz
-        zstd
     }
 }
