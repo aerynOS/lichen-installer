@@ -31,6 +31,8 @@ selection name="cosmic" summary="COSMIC Desktop" description="Stable, but still 
 		font-firacode
 		font-opensans
 		os-artwork
+		pkgset-aeryn-cosmic-minimal
+		pkgset-aeryn-cosmic-recommended
 		xdg-desktop-portal-cosmic
 		xdg-desktop-portal-gtk
 	}
