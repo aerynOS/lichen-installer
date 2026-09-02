@@ -12,7 +12,7 @@ selection name="desktop-common" summary="Desktop base" description="Common infra
 	    font-noto-emoji
 	    liberation-fonts-ttf
 	    scx-tools
-	    // system76-scheduler // superseded by scx-scheds
+	    system76-scheduler
 	    pkgset-aeryn-base-desktop
 	    zram-generator-defaults
 	}

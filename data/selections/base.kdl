@@ -12,7 +12,6 @@ selection name="base" summary="Base system" description="The base system for all
         "binary(nano)"
         "binary(ping)"
         "binary(ps)"
-        "binary(python)"
         "binary(screen)"
         "binary(sed)"
         "binary(setfont)"
@@ -22,16 +21,17 @@ selection name="base" summary="Base system" description="The base system for all
         "binary(unzip)"
         "binary(wget)"
         "binary(which)"
+        "sysbinary(fsck.exfat)"
         "sysbinary(fsck.ext4)"
         "sysbinary(fsck.f2fs)"
         "sysbinary(fsck.xfs)"
+        "sysbinary(ip)"
         bash-completion
         ca-certificates
         dbus
         dbus-broker
         dmidecode
         hyperv-daemons
-        iproute2
         pciutils
         pkgset-aeryn-base
         pkgset-aeryn-utilities
@@ -40,6 +40,11 @@ selection name="base" summary="Base system" description="The base system for all
         shadow
         spice-vdagent
         systemd
+        systemd-boot
+        systemd-coredump
+        systemd-preset-aeryn
+        systemd-resolved
+        systemd-udev
         tzdata
         usbutils
         util-linux
