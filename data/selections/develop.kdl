@@ -5,6 +5,6 @@ selection name="develop" summary="Development tooling" description="Install soft
     packages {
         "binary(boulder)"
         "binary(git)"
-        "binary(zed)"
+        "binary(yq)"
     }
 }
