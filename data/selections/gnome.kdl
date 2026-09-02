@@ -15,7 +15,7 @@ selection name="gnome" summary="GNOME Desktop" description="Recommended for most
         "binary(gnome-disks)"
         "binary(gnome-font-viewer)"
         "binary(gnome-software)"
-        "binary(gnome-system-monitor)"
+        // "binary(gnome-system-monitor)" // resources is better
         "binary(gnome-text-editor)"
         "binary(gnome-tweaks)"
         "binary(gnome-weather)"
@@ -28,10 +28,13 @@ selection name="gnome" summary="GNOME Desktop" description="Recommended for most
         "binary(showtime)"
         "binary(snapshot)"
         "binary(starship)"
+        "sysbinary(gdm)"
         gnome-backgrounds
         gnome-desktop-defaults
         gst-thumbnailers
         loupe
-        "sysbinary(gdm)"
+        pkgset-aeryn-gnome-minimal
+        pkgset-aeryn-gnome-recommended
+        serpent-gnome-defaults
     }
 }
