@@ -3,21 +3,17 @@ selection name="desktop-common" summary="Desktop base" description="Common infra
 		base
 	}
 	packages {
-		firefox
-		libva-intel-hybrid-driver
-		libva-intel-media-driver
-		mesa-dri-drivers
-		mesa-libegl
-		mesa-libgl
-		mesa-vulkan-drivers
-		networkmanager
-		networkmanager-bluetooth
-		networkmanager-wifi
-		networkmanager-wwan
-		pipewire
-		plymouth
-		polkit
-		systemd-preset-aeryn-desktop
-		wireplumber
+	    "binary(firefox)"
+	    "sysbinary(plymouthd)"
+	    flatpak
+	    font-hack
+	    font-noto
+	    font-noto-cjk
+	    font-noto-emoji
+	    liberation-fonts-ttf
+	    scx-tools
+	    // system76-scheduler // superseded by scx-scheds
+	    pkgset-aeryn-base-desktop
+	    zram-generator-defaults
 	}
 }
