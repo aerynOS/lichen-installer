@@ -181,3 +181,45 @@ strategy name="whole_disk_btrfs" summary="Wipe and use entire disk" {
     }
 }
 
+strategy name="whole_disk_bcachefs" summary="Wipe and use entire disk" {
+    find-disk "root_disk" {
+        constraints {
+            min (GiB)30
+        }
+    }
+
+    create-partition-table type="gpt" disk="root_disk"
+
+    create-partition disk="root_disk" role="boot" id="esp" {
+        constraints {
+            exactly (MiB)512
+        }
+        type (GUID)"efi-system-partition"
+        filesystem {
+            type "fat32"
+            label "ESP"
+        }
+    }
+
+    create-partition disk="root_disk" role="extended-boot" id="xbootldr" {
+        constraints {
+            exactly (MiB)3584
+        }
+        type (GUID)"linux-extended-boot"
+        filesystem {
+            type "fat32"
+            label "XBOOTLDR"
+        }
+    }
+
+    create-partition disk="root_disk" id="root" role="root" {
+        constraints {
+            min (GiB)25
+        }
+        type (GUID)"linux-root"
+        filesystem {
+            type "bcachefs"
+            label "ROOT"
+        }
+    }
+}

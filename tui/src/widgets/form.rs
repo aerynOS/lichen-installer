@@ -12,7 +12,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     layout::Rect,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState},
 };
 
 /// Rows each field occupies: a bordered box around one line of text
@@ -103,11 +103,16 @@ pub enum Outcome {
 pub struct Form {
     fields: Vec<Field>,
     focus: usize,
+    first_visible: usize,
 }
 
 impl Form {
     pub fn new(fields: Vec<Field>) -> Self {
-        Self { fields, focus: 0 }
+        Self {
+            fields,
+            focus: 0,
+            first_visible: 0,
+        }
     }
 
     pub fn value(&self, index: usize) -> &str {
@@ -138,6 +143,17 @@ impl Form {
     pub fn focus_on(&mut self, index: usize) {
         if index < self.fields.len() {
             self.focus = index;
+        }
+    }
+
+    /// Scroll the viewport so the focused field is drawn.
+    fn ensure_visible(&mut self, height: u16) {
+        let visible = (height / FIELD_HEIGHT).max(1) as usize;
+
+        if self.focus < self.first_visible {
+            self.first_visible = self.focus;
+        } else if self.focus >= self.first_visible + visible {
+            self.first_visible = self.focus + 1 - visible;
         }
     }
 
@@ -220,9 +236,15 @@ impl Form {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame<'_>, area: Rect) {
-        for (index, field) in self.fields.iter().enumerate() {
-            let y = area.y + index as u16 * FIELD_HEIGHT;
+    pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect) {
+        self.ensure_visible(area.height);
+
+        let visible = (area.height / FIELD_HEIGHT).max(1) as usize;
+        let scrolls = self.fields.len() > visible;
+        let width = area.width.saturating_sub(u16::from(scrolls));
+
+        for (index, field) in self.fields.iter().enumerate().skip(self.first_visible) {
+            let y = area.y + (index - self.first_visible) as u16 * FIELD_HEIGHT;
 
             if y + FIELD_HEIGHT > area.y + area.height {
                 break;
@@ -231,7 +253,7 @@ impl Form {
             let row = Rect {
                 x: area.x,
                 y,
-                width: area.width,
+                width,
                 height: FIELD_HEIGHT,
             };
             let focused = index == self.focus;
@@ -267,6 +289,23 @@ impl Form {
             };
 
             frame.render_widget(Paragraph::new(line), inner);
+        }
+
+        if scrolls {
+            let mut state = ScrollbarState::new(self.fields.len() - visible + 1)
+                .position(self.first_visible)
+                .viewport_content_length(visible);
+
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .thumb_symbol(SCROLL_THUMB)
+                    .track_symbol(Some(SCROLL_TRACK))
+                    .begin_symbol(None)
+                    .end_symbol(None)
+                    .style(FRAME),
+                area,
+                &mut state,
+            );
         }
     }
 }

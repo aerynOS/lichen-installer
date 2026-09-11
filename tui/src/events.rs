@@ -58,12 +58,14 @@ pub enum Msg {
     InstallProgress {
         phase: String,
         line: String,
+        fraction: Option<f32>,
     },
     /// The animation clock. Delivered like any other message, so a screen that
     /// wants to animate just counts them; nothing else has to know.
     Tick,
     InstallFinished,
     InstallFailed(String),
+    RebootAccepted,
 }
 
 /// What a screen tells the applicaiton after seeing a key.
