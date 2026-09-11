@@ -16,7 +16,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, Wrap},
 };
 
 enum Stage {
@@ -83,14 +83,7 @@ impl Summary {
                     format!("{} (console {})", model.region.layout, model.region.keymap)
                 },
             ),
-            row(
-                "Desktop",
-                format!(
-                    "{} ({} packages)",
-                    model.software.selection,
-                    model.software.packages.len()
-                ),
-            ),
+            row("Desktop", format!("{})", model.software.selection,)),
             row(
                 "User",
                 match &model.accounts.user {
@@ -257,16 +250,35 @@ impl Screen for Summary {
         }
 
         let lines = self.review(model);
+        let [text, track] = Layout::horizontal([Constraint::Min(1), Constraint::Length(1)]).areas(body);
+        let total: u16 = lines.iter().map(|line| rows(line, text.width)).sum();
         // Prevent scrolling past the end
-        let limit = (lines.len() as u16).saturating_sub(body.height);
+        let limit = total.saturating_sub(body.height);
 
         self.scroll = self.scroll.min(limit);
         frame.render_widget(
             Paragraph::new(lines)
                 .scroll((self.scroll, 0))
                 .wrap(Wrap { trim: false }),
-            body,
+            text,
         );
+
+        if limit > 0 {
+            let mut state = ScrollbarState::new((limit + 1) as usize)
+                .position(self.scroll as usize)
+                .viewport_content_length(body.height as usize);
+
+            frame.render_stateful_widget(
+                Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .thumb_symbol(SCROLL_THUMB)
+                    .track_symbol(Some(SCROLL_TRACK))
+                    .begin_symbol(None)
+                    .end_symbol(None)
+                    .style(FRAME),
+                track,
+                &mut state,
+            );
+        }
     }
 }
 
@@ -278,4 +290,34 @@ fn row(label: &str, value: String) -> Line<'static> {
         Span::styled(format!("{label:<14}"), HINT),
         Span::styled(value, BODY),
     ])
+}
+
+/// Rows a line occupies once the paragraph has wrapped it at `width`.
+fn rows(line: &Line<'_>, width: u16) -> u16 {
+    let width = width.max(1) as usize;
+    let text = line.spans.iter().map(|span| span.content.as_ref()).collect::<String>();
+
+    if text.is_empty() {
+        return 1;
+    }
+
+    let mut rows = 1;
+    let mut used = 0;
+
+    for word in text.split_inclusive(' ') {
+        let needed = Span::raw(word).width();
+
+        if used + needed > width && used > 0 {
+            rows += 1;
+            used = 0;
+        }
+
+        used += needed;
+
+        while used > width {
+            rows += 1;
+            used -= width;
+        }
+    }
+    rows
 }

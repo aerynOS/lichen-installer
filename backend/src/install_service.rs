@@ -24,7 +24,7 @@ use std::{
     process::{Command, Stdio},
     sync::{
         Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
     thread,
     time::Duration,
@@ -56,6 +56,7 @@ const REPO_DIR: &str = "etc/moss/repo.d";
 /// An empty phase means "still whatever was last announced", which is what
 /// every line captured from a subprocess is.
 type Progress<'a> = &'a (dyn Fn(&str, String) + Sync);
+type Fraction<'a> = &'a (dyn Fn(f32) + Sync);
 /// The unstable repo kdl entry
 const UNSTABLE_REPO: &str = r#"unstable {
     description "AerynOS unstable package stream"
@@ -174,6 +175,7 @@ impl Install for Service {
                         message: String::new(),
                         finished: false,
                         phase: String::new(),
+                        fraction: None,
                     };
 
                     if tx.blocking_send(Ok(update)).is_err() {
@@ -189,9 +191,18 @@ impl Install for Service {
                     message,
                     finished: false,
                     phase: phase.to_string(),
+                    fraction: None,
                 }));
             };
-            let result = install_target(&request, &progress);
+            let fraction = |completed: f32| {
+                let _ = tx.blocking_send(Ok(InstallProgress {
+                    message: String::new(),
+                    finished: false,
+                    phase: String::new(),
+                    fraction: Some(completed),
+                }));
+            };
+            let result = install_target(&request, &progress, &fraction);
 
             done.store(true, Ordering::Relaxed);
             match result {
@@ -200,6 +211,7 @@ impl Install for Service {
                         message: "Installation complete".to_string(),
                         finished: true,
                         phase: String::new(),
+                        fraction: None,
                     }));
                 }
                 Err(status) => {
@@ -301,7 +313,11 @@ fn discover_models() -> Result<Vec<DiscoveredModel>, Status> {
 
 /// Mount the target filesystems, install the OS via moss from the system
 /// model written earlier, configure the target, and always unmount again
-fn install_target(request: &InstallSystemRequest, progress: Progress<'_>) -> Result<(), Status> {
+fn install_target(
+    request: &InstallSystemRequest,
+    progress: Progress<'_>,
+    fraction: Fraction<'_>,
+) -> Result<(), Status> {
     let target = Path::new(TARGET_MOUNT);
     fs::create_dir_all(target)?;
 
@@ -364,13 +380,14 @@ fn install_target(request: &InstallSystemRequest, progress: Progress<'_>) -> Res
         info!("Running moss sync against the target (this can take a while)");
         let sync_result = run_streaming(
             Command::new("moss")
-                .args(["sync", "--import"])
+                .args(["--log", "info:json:stderr", "sync", "--import"])
                 .arg(target.join(SYSTEM_MODEL_PATH))
                 .arg("-D")
                 .arg(target)
                 .arg("-u")
                 .arg("-y"),
             progress,
+            fraction,
         );
 
         if let Err(ref err) = sync_result {
@@ -606,7 +623,7 @@ fn blkid(device: &str, tag: &str) -> Result<String, Status> {
 
 /// Run a long command forwarding its output lines as progress, keeping
 /// tail of recent lines for error reporting
-fn run_streaming(command: &mut Command, progress: Progress<'_>) -> Result<(), Status> {
+fn run_streaming(command: &mut Command, progress: Progress<'_>, fraction: Fraction<'_>) -> Result<(), Status> {
     let mut child = command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -623,10 +640,18 @@ fn run_streaming(command: &mut Command, progress: Progress<'_>) -> Result<(), St
         }
         tail.push_back(line.to_string());
     };
+    let total = AtomicUsize::new(0);
+    let installed = AtomicUsize::new(0);
 
     thread::scope(|scope| {
         scope.spawn(|| {
             for line in BufReader::new(stderr).lines().map_while(Result::ok) {
+                if line.contains(r#""event_type":"progress""#) {
+                    if let Some(completed) = reported_fraction(&line) {
+                        fraction(completed);
+                    }
+                    continue;
+                }
                 record(&line);
                 warn!("stderr: {line}");
             }
@@ -636,9 +661,20 @@ fn run_streaming(command: &mut Command, progress: Progress<'_>) -> Result<(), St
             record(&line);
 
             let cleaned = clean_line(&line);
-            if !cleaned.is_empty() {
-                progress("", cleaned);
+            if cleaned.is_empty() {
+                continue;
             }
+
+            if cleaned.starts_with("Installed ") {
+                let done = installed.fetch_add(1, Ordering::Relaxed) + 1;
+                let expected = total.load(Ordering::Relaxed);
+
+                if expected > 0 {
+                    fraction(done as f32 / expected as f32);
+                }
+            }
+
+            progress("", cleaned);
         }
     });
 
@@ -681,6 +717,24 @@ fn clean_line(line: &str) -> String {
         }
     }
     cleaned.trim().to_string()
+}
+
+fn reported_fraction(line: &str) -> Option<f32> {
+    if !line.contains(r#""message":"Cached "#) {
+        return None;
+    }
+
+    let value: serde_json::Value = serde_json::from_str(line).ok()?;
+    if value.get("span")?.get("phase")?.as_str()? != "cache_packages" {
+        return None;
+    }
+
+    let fields = value.get("fields")?;
+    if fields.get("event_type")?.as_str()? != "progress_update" {
+        return None;
+    }
+
+    fields.get("progress")?.as_f64().map(|progress| progress as f32)
 }
 
 /// Run a command to completion, mapping failure to a gRPC status carrying

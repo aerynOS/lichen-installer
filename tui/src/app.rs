@@ -97,6 +97,7 @@ pub struct App {
     rx: UnboundedReceiver<Msg>,
     redraw: bool,
     quit: bool,
+    rebooting: bool,
 }
 
 impl App {
@@ -137,13 +138,14 @@ impl App {
             rx,
             redraw: false,
             quit: false,
+            rebooting: false,
         }
     }
 
     /// Draw then wait. Every wake-up, a key, a RPC result, a failure,
     /// arrives on the one channel, so the UI is never stale and
     /// never spins.
-    pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<()> {
+    pub async fn run(mut self, mut terminal: DefaultTerminal) -> Result<bool> {
         self.screens[self.current].on_enter(&self.ctx, &self.model);
         self.keyboard.start(&self.ctx);
 
@@ -172,7 +174,7 @@ impl App {
             }
         }
 
-        Ok(())
+        Ok(self.rebooting)
     }
 
     fn handle(&mut self, msg: Msg) {
@@ -188,6 +190,11 @@ impl App {
 
         if let Msg::Failed(reason) = &msg {
             self.overlay = Overlay::Error(reason.clone());
+        }
+
+        if matches!(msg, Msg::RebootAccepted) {
+            self.rebooting = true;
+            self.quit = true;
         }
 
         // Offered to every screen, not just the active one: navigating away

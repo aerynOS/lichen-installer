@@ -50,7 +50,10 @@ pub const COMPLETE: &str = "√";
 pub const ACTIVE: &str = "·";
 /// Stands in for one character of a masked field.
 pub const MASK: &str = "*";
-/// One bar of a signal strength meter. CP473 0xDB.
-pub const BAR: &str = "█";
+/// Progress bar animation
+pub const BAR: [&str; 5] = ["■", "≡", "=", "-", " "];
+/// Scrollbar thumb and track.
+pub const SCROLL_THUMB: &str = "█";
+pub const SCROLL_TRACK: &str = "|";
 /// Heartbeat animation
 pub const HEARTBEAT: [&str; 9] = ["-", "-", "=", "≡", "■", "≡", "=", "-", "-"];

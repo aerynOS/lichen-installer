@@ -28,7 +28,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent},
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Gauge, Paragraph},
+    widgets::{Paragraph, Wrap},
 };
 use tokio::sync::mpsc::UnboundedSender;
 use tonic::{Status, transport::Channel};
@@ -53,6 +53,7 @@ const PHASES: [(&str, &str, u16); 7] = [
 enum State {
     Working,
     Done,
+    Rebooting,
     Failed,
 }
 
@@ -85,6 +86,10 @@ pub struct Install {
     started: bool,
     /// Index into `PHASES`
     phase: usize,
+    /// How far through the running phase of the tool doing the work states
+    fraction: f32,
+    /// The current package in heartbeat
+    package: Option<String>,
     /// Animation clock, counted from `Msg::Tick`
     tick: usize,
     /// Which of the two finished-install buttson has focus
@@ -100,6 +105,8 @@ impl Install {
             log: Vec::new(),
             started: false,
             phase: 0,
+            fraction: 0.0,
+            package: None,
             tick: 0,
             choice: Choice::Reboot,
             ctx: None,
@@ -112,15 +119,26 @@ impl Install {
     /// seeing "5 of 7" sat above "20%" is what tells the user the long phase
     /// is still ahead of them.
     fn render_progress(&self, frame: &mut Frame<'_>, area: Rect) {
-        let [label, phase, total] =
-            Layout::vertical([Constraint::Length(1), Constraint::Length(1), Constraint::Length(1)]).areas(area);
         let (beat, title, style) = match self.state {
-            State::Working => (HEARTBEAT[self.tick % HEARTBEAT.len()], PHASES[self.phase].1, HEADING),
-            State::Done => (COMPLETE, "All phases complete. It is safe to reboot.", SUCCESS),
-            State::Failed => ("!", PHASES[self.phase].1, ERROR),
+            State::Working => (HEARTBEAT[self.tick % HEARTBEAT.len()], self.working_title(), HEADING),
+            State::Done => (
+                COMPLETE,
+                "All phases complete. It is safe to reboot.".to_string(),
+                SUCCESS,
+            ),
+            State::Rebooting => (
+                HEARTBEAT[self.tick % HEARTBEAT.len()],
+                "Rebooting...".to_string(),
+                SUCCESS,
+            ),
+            State::Failed => ("!", PHASES[self.phase].1.to_string(), ERROR),
         };
+        let [label, bars] = Layout::vertical([Constraint::Length(1), Constraint::Length(2)]).areas(area);
 
         frame.render_widget(Paragraph::new(Line::styled(format!("{beat} {title}"), style)), label);
+
+        let [phase, total] = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(bars);
+
         bar_row(
             frame,
             phase,
@@ -137,14 +155,27 @@ impl Install {
         );
     }
 
+    /// What the heatbeat syas while work is running.
+    fn working_title(&self) -> String {
+        match &self.package {
+            Some(package) if PHASES[self.phase].0 == "packages" => format!("Installing package: {package}"),
+            _ => PHASES[self.phase].1.to_string(),
+        }
+    }
+
     /// Share of the work already completed.
     ///
     /// A phase counts only once it has been completed, so the bar never takes credit
     /// for work still in-progress.
     fn completed(&self) -> u16 {
         match self.state {
-            State::Done => 100,
-            _ => PHASES.iter().take(self.phase).map(|(_, _, weight)| weight).sum(),
+            State::Done | State::Rebooting => 100,
+            _ => {
+                let finished: u16 = PHASES.iter().take(self.phase).map(|(_, _, weight)| weight).sum();
+                let running = (PHASES[self.phase].2 as f32 * self.fraction) as u16;
+
+                finished + running
+            }
         }
     }
 
@@ -155,12 +186,12 @@ impl Install {
         };
         let channel = ctx.channel.clone();
 
+        self.state = State::Rebooting;
+
         ctx.spawn(async move {
             SystemClient::new(channel).reboot(()).await?;
 
-            // Only reached if the machine did not reboot; a failure
-            // arrives as Msg::Failed and opens the error overlay.
-            Ok(Msg::Tick)
+            Ok(Msg::RebootAccepted)
         });
 
         Action::Consumed
@@ -274,12 +305,25 @@ impl Screen for Install {
     fn on_message(&mut self, msg: &Msg, _model: &mut Model) {
         match msg {
             Msg::Tick => self.tick = self.tick.wrapping_add(1),
-            Msg::InstallProgress { phase, line } => {
+            Msg::InstallProgress { phase, line, fraction } => {
                 if let Some(index) = PHASES.iter().position(|(phas, _, _)| phas == phase) {
+                    if index != self.phase {
+                        self.fraction = 0.0;
+                    }
                     self.phase = index;
                 }
 
-                if !line.is_empty() {
+                if let Some(completed) = fraction {
+                    self.fraction = self.fraction.max(*completed);
+                }
+
+                if let Some(name) = line.strip_prefix("Installed ") {
+                    let name = name.strip_suffix(" (cached)").unwrap_or(name);
+                    self.package = Some(name.to_string());
+                } else if !line.is_empty()
+                    && PHASES[self.phase].0 != "packages"
+                    && line.as_str() != PHASES[self.phase].1
+                {
                     self.log.push(line.clone());
                 }
             }
@@ -304,16 +348,18 @@ impl Screen for Install {
                 "Get ready for the aerynOS, experience! It's now installed on your device!!!",
                 SUCCESS,
             ),
+            State::Rebooting => ("Rebooting", SUCCESS),
             State::Failed => ("The installation failed", ERROR),
         };
         let note = match self.state {
             State::Working => format!("Writing to {}. Do not power off.", model.storage.disk),
             State::Done => "Choose Reboot now to start boot into your newly installed system, or Quit to stay in the live environment".to_string(),
+            State::Rebooting => "Leaving the installer so the system can reboot.".to_string(),
             State::Failed => "The disk may be in a partial state".to_string(),
         };
 
         frame.render_widget(
-            Paragraph::new(vec![Line::styled(title, style), Line::styled(note, HINT)]),
+            Paragraph::new(vec![Line::styled(title, style), Line::styled(note, HINT)]).wrap(Wrap { trim: false }),
             heading,
         );
 
@@ -341,6 +387,7 @@ async fn run(job: &Job, tx: &UnboundedSender<Msg>) -> Result<(), Status> {
         let _ = tx.send(Msg::InstallProgress {
             phase: phase.to_string(),
             line: message,
+            fraction: None,
         });
     };
 
@@ -410,15 +457,16 @@ async fn run(job: &Job, tx: &UnboundedSender<Msg>) -> Result<(), Status> {
         .into_inner();
 
     while let Some(update) = stream.message().await? {
-        if !update.phase.is_empty() || !update.message.is_empty() {
+        if update.finished {
+            return Ok(());
+        }
+
+        if !update.phase.is_empty() || !update.message.is_empty() || update.fraction.is_some() {
             let _ = tx.send(Msg::InstallProgress {
                 phase: update.phase,
                 line: update.message,
+                fraction: update.fraction,
             });
-        }
-
-        if update.finished {
-            return Ok(());
         }
     }
 
@@ -429,14 +477,27 @@ async fn run(job: &Job, tx: &UnboundedSender<Msg>) -> Result<(), Status> {
 fn bar_row(frame: &mut Frame<'_>, area: Rect, caption: &str, percent: u16, value: String) {
     let [caption_area, bar, value_area] =
         Layout::horizontal([Constraint::Length(7), Constraint::Min(10), Constraint::Length(9)]).areas(area);
+    let cells = bar.width.saturating_sub(2);
+    let steps = percent.min(100) as u32 * cells as u32 * 4 / 100;
+    let full = (steps / 4) as u16;
+    let partial = (steps % 4) as usize;
+    let mut drawn = BAR[0].repeat(full as usize);
+
+    if full < cells && partial > 0 {
+        drawn.push_str(BAR[4 - partial]);
+    }
+
+    let used = full + u16::from(full < cells && partial > 0);
+
+    drawn.push_str(&BAR[4].repeat(cells.saturating_sub(used) as usize));
 
     frame.render_widget(Paragraph::new(Line::styled(caption.to_string(), HINT)), caption_area);
     frame.render_widget(
-        Gauge::default()
-            .gauge_style(STEP_ACTIVE)
-            .use_unicode(false)
-            .percent(percent.min(100))
-            .label(""),
+        Paragraph::new(Line::from(vec![
+            Span::styled("|", FRAME),
+            Span::styled(drawn, STEP_ACTIVE),
+            Span::styled("|", FRAME),
+        ])),
         bar,
     );
     frame.render_widget(Paragraph::new(Line::styled(value, BODY)).right_aligned(), value_area);

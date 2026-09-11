@@ -57,11 +57,21 @@ impl system_server::System for Service {
 
         // Not waited beyond the ask: systemd takes it from
         // here, and this process is about to stop existing.
-        Command::new("systemctl")
+        let output = Command::new("systemctl")
             .args(["--no-block", "reboot"])
-            .status()
+            .output()
             .await
             .map_err(|err| tonic::Status::internal(format!("failed to reboot: {err}")))?;
+
+        if !output.status.success() {
+            let detail = String::from_utf8_lossy(&output.stderr);
+            let detail = detail.trim();
+
+            warn!(detail, "systemctl refused the reboot");
+            return Err(tonic::Status::internal(format!(
+                "systemctl refused the reboot: {detail}"
+            )));
+        }
 
         Ok(Response::new(SystemRebootResponse { rebooting: true }))
     }

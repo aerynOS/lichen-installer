@@ -123,6 +123,10 @@ message InstallProgress {
   // a subprecess, which does not know which phase it's in. Deliberately
   // separate from `message` so that text stays free to be reworded.
   string phase = 3;
+
+  // Fraction of the current phase completed, 0.0 - 1.0; reported by the tool doing
+  // the work. Absent on lines that don't need it.
+  optional float fraction = 4;
 }
 
 // A package repository to prime into the target before syncing

@@ -37,7 +37,15 @@ const RAW_SELECTIONS: &[&str] = &[
 /// Always part of an installation, never offered as a choice
 const IMPLICIT: &[&str] = &["kernel-common", "kernel-desktop"];
 /// Structural rather than user-facing
-const HIDDEN: &[&str] = &["base", "desktop-common", "develop", "kernel-common", "kernel-desktop"];
+const HIDDEN: &[&str] = &[
+    "base",
+    "desktop-common",
+    "develop",
+    "kernel-common",
+    "kernel-desktop",
+    "windowmanager",
+    "server",
+];
 
 /// Parse all embedded selections
 pub fn all() -> Vec<Selection> {
@@ -150,17 +158,29 @@ mod tests {
         let selections = all();
         assert_eq!(selections.len(), 10);
         assert!(desktops().iter().any(|sel| sel.name == "cosmic"));
-        assert!(desktops().iter().any(|sel| sel.name == "server"));
         assert!(desktops().iter().all(|sel| !HIDDEN.contains(&sel.name.as_str())));
     }
 
     #[test]
     fn resolve_includes_dependency_closure() {
-        let packages = resolve("gnome").expect("gnome must resolve");
-        assert!(packages.contains(&"gnome-desktop-defaults".to_string()));
-        assert!(packages.contains(&"mesa-dri-drivers".to_string()));
-        assert!(packages.contains(&"bash".to_string()));
-        assert!(packages.contains(&"linux-stable".to_string()));
+        let selections = all();
+        let packages_of = |name: &str| -> Vec<String> {
+            selections
+                .iter()
+                .find(|selection| selection.name == name)
+                .unwrap_or_else(|| panic!("{name} must exist"))
+                .packages
+                .clone()
+        };
+
+        let expected = ["gnome", "desktop-common", "base", "kernel-desktop", "kernel-common"]
+            .into_iter()
+            .flat_map(packages_of)
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect::<Vec<String>>();
+
+        assert_eq!(resolve("gnome").expect("gnome must resolve"), expected);
     }
 
     #[test]
@@ -168,12 +188,12 @@ mod tests {
         let desktop = mandatory("plasma").expect("desktop-common must resolve");
         assert!(desktop.contains(&"systemd-udev".to_string()));
         assert!(desktop.contains(&"linux-stable".to_string()));
-        assert!(desktop.contains(&"mesa-dri-drivers".to_string()));
+        assert!(desktop.contains(&"pkgset-aeryn-base-desktop".to_string()));
 
         let server = mandatory("server").expect("base must resolve");
         assert!(server.contains(&"systemd-udev".to_string()));
         assert!(
-            !server.contains(&"mesa-dri-drivers".to_string()),
+            !server.contains(&"pkgset-aeryn-base-desktop".to_string()),
             "server stays headless"
         );
     }

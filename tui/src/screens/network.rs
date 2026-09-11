@@ -545,5 +545,5 @@ fn entry(point: &AccessPoint) -> Line<'static> {
 /// this survives a bare TTY as well as a terminal emulator.
 fn bars(signal: u32) -> String {
     let filled = (signal as usize).min(100).div_ceil(25);
-    format!("[{}{}]", BAR.repeat(filled), " ".repeat(4 - filled))
+    format!("[{}{}]", SCROLL_THUMB.repeat(filled), " ".repeat(4 - filled))
 }

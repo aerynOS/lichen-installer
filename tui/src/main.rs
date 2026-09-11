@@ -84,7 +84,9 @@ async fn main() -> Result<()> {
 
     // Restore first, report second.
     ratatui::restore();
-    if let Some(spawned) = spawned {
+    if let Some(spawned) = spawned
+        && !matches!(result, Ok(true))
+    {
         spawned.stop(channel).await;
     }
 
@@ -92,5 +94,5 @@ async fn main() -> Result<()> {
         Some(path) => println!("Installer log: {}", path.display()),
         None => eprintln!("Installer log: could not be opened"),
     }
-    result
+    result.map(|_| ())
 }
