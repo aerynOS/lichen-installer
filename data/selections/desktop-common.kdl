@@ -11,6 +11,7 @@ selection name="desktop-common" summary="Desktop base" description="Common infra
 	    font-noto-cjk
 	    font-noto-emoji
 	    liberation-fonts-ttf
+	    os-artwork
 	    scx-tools
 	    system76-scheduler
 	    pkgset-aeryn-base-desktop

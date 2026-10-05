@@ -21,6 +21,7 @@ selection name="base" summary="Base system" description="The base system for all
         "binary(unzip)"
         "binary(wget)"
         "binary(which)"
+        "sysbinary(fsck.btrfs)"
         "sysbinary(fsck.exfat)"
         "sysbinary(fsck.ext4)"
         "sysbinary(fsck.f2fs)"
