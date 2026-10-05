@@ -1,0 +1,24 @@
+selection name="budgie" summary="Budgie Desktop" description="Recommended for most users." {
+	depends {
+		desktop-common
+	}
+	// Last synced with pkgset-aeryn-budgie 2026-10-05
+	packages {
+		"binary(budgie-control-center)"
+		"binary(org.buddiesofbudgie.budgie-desktop-view)"
+		"binary(wdisplays)"
+		"binary(bluejay)"
+		budgie-desktop-defaults
+		"binary(dolphin)"
+		"binary(konsole)"
+		"binary(kwrite)"
+		"binary(plasma-discover)"
+		"binary(plasma-systemmonitor)"
+		"binary(dragon)"
+		"binary(gwenview)"
+		partitionmanager
+		"binary(sddm)"
+		pkgset-aeryn-budgie-minimal
+		pkgset-aeryn-budgie-recommended
+	}
+}
