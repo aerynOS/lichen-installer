@@ -58,7 +58,7 @@ impl system_server::System for Service {
         // Not waited beyond the ask: systemd takes it from
         // here, and this process is about to stop existing.
         let output = Command::new("systemctl")
-            .args(["--no-block", "reboot"])
+            .args(["--no-block", "--check-inhibitors=no", "reboot"])
             .output()
             .await
             .map_err(|err| tonic::Status::internal(format!("failed to reboot: {err}")))?;
