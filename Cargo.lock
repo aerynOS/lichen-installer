@@ -430,82 +430,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "clap"
-version = "4.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d91e0c145792ef73a6ad36d27c75ac09f1832222a3c209689d90f534685ee5b7"
-dependencies = [
- "clap_builder",
- "clap_derive",
-]
-
-[[package]]
-name = "clap_builder"
-version = "4.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09628afdcc538b57f3c6341e9c8e9970f18e4a481690a64974d7023bd33548b"
-dependencies = [
- "anstream",
- "anstyle",
- "clap_lex",
- "strsim",
-]
-
-[[package]]
-name = "clap_derive"
-version = "4.6.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d012d2b9d65aca7f18f4d9878a045bc17899bba951561ba5ec3c2ba1eed9a061"
-dependencies = [
- "heck",
- "proc-macro2",
- "quote",
- "syn 3.0.3",
-]
-
-[[package]]
-name = "clap_lex"
-version = "1.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8d4a3bb8b1e0c1050499d1815f5ab16d04f0959b233085fb31653fbfc9d98f9"
-
-[[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "chrono",
- "chrono-tz",
- "clap",
- "cliclack",
- "color-eyre",
- "console",
- "installer",
- "kdl",
- "protocols",
- "sha-crypt",
- "tokio",
- "tracing",
- "tracing-error",
- "tracing-subscriber",
- "yescrypt",
-]
-
-[[package]]
-name = "cliclack"
-version = "0.3.5"
-source = "git+https://github.com/ikeycode/cliclack.git#35a1882c601b90bf1398c3cb867cc6b20bbe9ce9"
-dependencies = [
- "console",
- "indicatif",
- "once_cell",
- "strsim",
- "termsize",
- "textwrap",
- "zeroize",
-]
-
-[[package]]
 name = "cmake"
 version = "0.1.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1517,7 +1441,7 @@ version = "0.1.0"
 dependencies = [
  "inventory",
  "protocols",
- "thiserror",
+ "thiserror 2.0.19",
  "tonic",
  "tracing",
 ]
