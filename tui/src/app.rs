@@ -172,6 +172,15 @@ impl App {
                 },
                 _ = heartbeat.tick() => self.handle(Msg::Tick),
             }
+
+            // drain whatever queued up meanwhile before drawing again.
+            // can happen when e.g. typing fast or pasting something, this
+            // prevents each keystroke from rendering again immediately
+            while !self.quit
+                && let Ok(msg) = self.rx.try_recv()
+            {
+                self.handle(msg);
+            }
         }
 
         Ok(self.rebooting)
