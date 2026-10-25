@@ -10,7 +10,6 @@
 use crate::theme::*;
 use ratatui::{
     Frame,
-    buffer::CellDiffOption,
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
@@ -162,13 +161,6 @@ impl FilterList {
 
     pub fn render(&mut self, frame: &mut Frame<'_>, area: Rect) {
         let [search, body] = Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).areas(area);
-        let buffer = frame.buffer_mut();
-
-        for position in body.positions() {
-            if let Some(cell) = buffer.cell_mut(position) {
-                cell.set_diff_option(CellDiffOption::AlwaysUpdate);
-            }
-        }
 
         let search_line = if self.filter.is_empty() {
             Line::styled(format!("Type to filter · {} entries", self.entries.len()), HINT)
