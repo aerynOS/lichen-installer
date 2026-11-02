@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn embedded_selections_parse() {
         let selections = all();
-        assert_eq!(selections.len(), 10);
+        assert_eq!(selections.len(), 11);
         assert!(desktops().iter().any(|sel| sel.name == "cosmic"));
         assert!(desktops().iter().all(|sel| !HIDDEN.contains(&sel.name.as_str())));
     }
