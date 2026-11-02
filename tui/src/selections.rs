@@ -23,6 +23,7 @@ pub struct Selection {
 /// Raw embedded selection documents
 const RAW_SELECTIONS: &[&str] = &[
     include_str!("../../data/selections/base.kdl"),
+    include_str!("../../data/selections/budgie.kdl"),
     include_str!("../../data/selections/desktop-common.kdl"),
     include_str!("../../data/selections/cosmic.kdl"),
     include_str!("../../data/selections/develop.kdl"),
