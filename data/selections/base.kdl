@@ -1,4 +1,4 @@
-selection name="base" summary="Base system" description="The base system for all AerynOS installations." {
+selection name="base" summary="Base system" description="The base system for all aerynOS installations." {
     packages {
         "binary(bash)"
         "binary(dash)"

@@ -116,7 +116,7 @@ impl Summary {
             .title(Line::styled(" Point of no return ", ERROR));
         let inner = block.inner(prompt);
         let lines = vec![
-            Line::styled(format!("Erase {} and install AerynOS?", model.storage.disk), WARNING),
+            Line::styled(format!("Erase {} and install aerynOS?", model.storage.disk), WARNING),
             Line::raw(""),
             Line::styled("Everything on this disk will be destroyed. Nothing has been", BODY),
             Line::styled("written yet; this is the last moment as which that is true.", BODY),

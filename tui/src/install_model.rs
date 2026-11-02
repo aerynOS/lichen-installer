@@ -92,7 +92,7 @@ fn repositories_node() -> KdlNode {
     let mut unstable_children = KdlDocument::new();
     let mut description = KdlNode::new("description");
 
-    description.push(KdlEntry::new("AerynOS unstable package stream"));
+    description.push(KdlEntry::new("aerynOS unstable package stream"));
     unstable_children.nodes_mut().push(description);
 
     let mut base_uri = KdlNode::new("base-uri");

@@ -59,7 +59,7 @@ type Progress<'a> = &'a (dyn Fn(&str, String) + Sync);
 type Fraction<'a> = &'a (dyn Fn(f32) + Sync);
 /// The unstable repo kdl entry
 const UNSTABLE_REPO: &str = r#"unstable {
-    description "AerynOS unstable package stream"
+    description "aerynOS unstable package stream"
     base-uri "https://cdn.aerynos.dev/"
     channel main
     version "stream/unstable"
