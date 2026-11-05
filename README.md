@@ -1,6 +1,6 @@
 # lichen
 
-A heavily in-development, experimental, and early days installer for AerynOS.
+A heavily in-development, experimental, and early days installer for aerynOS.
 A privileged backend (`lichen_backend`) provides all the relevant logic and
 functionality, while a frontend (`cli`) provides a user interface for the
 installer.
@@ -15,7 +15,7 @@ Eventually we'll support TCP sockets for remote installations, empowering
 a WASM frontend for web-based installations, and more. Before then we need to
 get our ducks in a row (and add Polkit middleware checks for the backend, etc).
 
-Much of the code is powered by our [disks-rs](https://github.com/AerynOS/disks-rs)
+Much of the code is powered by our [disks-rs](https://github.com/aerynOS/disks-rs)
 project, including disk enumeration, analysis, provisioning and dynamic disk strategies.
 
 ## Build & Test
